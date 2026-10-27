@@ -1,0 +1,7 @@
+
+import { createToaster } from '@skeletonlabs/skeleton-svelte';
+
+export const toaster = createToaster({
+	overlap: true,
+	placement: 'top',
+});

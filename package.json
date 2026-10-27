@@ -1,0 +1,31 @@
+{
+  "name": "gnaghome",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:backend": "bun --filter @gnaghome/backend dev",
+    "dev:frontend": "bun --filter @gnaghome/frontend dev",
+    "dev": "concurrently \"bun run dev:backend\" \"bun run dev:frontend\"",
+    "check-port": "bunx detect-port 5173",
+    "free-port": "bunx kill-port 5173",
+    "start:backend": "bun --filter @gnaghome/backend start",
+    "start:frontend": "bun --filter @gnaghome/frontend start",
+    "start": "concurrently \"bun run start:backend\" \"bun run start:frontend\"",
+    "db:generate": "bun --filter @gnaghome/backend db:generate",
+    "db:migrate": "bun --filter @gnaghome/backend db:migrate",
+    "db:studio": "bun --filter @gnaghome/backend db:studio",
+    "db:checkpoint": "bun --filter @gnaghome/backend db:checkpoint"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.0",
+    "concurrently": "^9.2.4"
+  },
+  "dependencies": {
+    "rollup": "^4.62.5",
+    "vite": "^8.2.2"
+  }
+}

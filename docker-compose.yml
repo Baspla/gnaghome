@@ -1,0 +1,45 @@
+name: gnaghome
+
+services:
+  frontend:
+    image: ghcr.io/baspla/gnaghome-frontend:latest
+    container_name: gnaghome_frontend
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+    networks:
+      - proxy
+      - gnaghome
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          memory: 128M
+  backend:
+    image: ghcr.io/baspla/gnaghome-backend:latest
+    container_name: gnaghome_backend
+    env_file:
+      - .env
+    networks:
+      - gnaghome
+      - proxy
+    ports:
+      - "8081:3000"
+    volumes:
+      - gnaghome_data:/app/backend/data
+    restart: unless-stopped
+volumes:
+  gnaghome_data:
+    # Keep using the existing Compose-managed data volume across the project rename.
+    name: gnagchat_gnagchat_data
+    driver: local
+
+networks:
+  gnaghome:
+    driver: bridge
+  proxy:
+    external: true

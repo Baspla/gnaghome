@@ -1,0 +1,3 @@
+# Design Assumptions and Restrictions
+
+Das Websocket/Nachrichten System ist als fan-out on write designed. Also das jeder Client seinen eigenen Namespace hat über den er alle Events bekommt. Nachrichten an einen Chatraum werden also über den broadcast Endpoint an alle Namespaces der Clients geschickt die in diesem Chatraum sind. Das hält den Client simpel und würde erst zu einem Problem werden wenn es sehr viele Clients in einem Chatraum gibt. Geplant sind aber nur ca um die 10 Clients pro Chatraum.
