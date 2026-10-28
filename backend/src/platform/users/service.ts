@@ -23,7 +23,8 @@ export class UserService {
             .select({
                 id: user.id,
                 name: user.name,
-                image: user.image
+                image: user.image,
+                createdAt: user.createdAt,
             })
             .from(user)
             .where(eq(user.id, id))

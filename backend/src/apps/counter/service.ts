@@ -19,8 +19,10 @@ export type CounterCounts = {
 };
 
 export type LeaderboardEntry = {
+    id: string;
     rank: number;
     name: string;
+    image: string | null;
     count: number;
 };
 
@@ -50,7 +52,9 @@ export class CounterService {
                     .get();
 
                 const leaderboardRows = transaction.select({
+                    id: user.id,
                     name: user.name,
+                    image: user.image,
                     count: sql<number>`coalesce(${counter.count}, 0)`,
                 })
                     .from(user)
@@ -62,8 +66,10 @@ export class CounterService {
                     userCount: userRow?.count ?? 0,
                     totalCount: globalRow?.count ?? 0,
                     leaderboard: leaderboardRows.map((entry, index) => ({
+                        id: entry.id,
                         rank: index + 1,
                         name: entry.name,
+                        image: entry.image,
                         count: entry.count,
                     })),
                 };
@@ -103,7 +109,9 @@ export class CounterService {
                     .where(eq(counter.id, GLOBAL_COUNTER_ID))
                     .get();
                 const leaderboardRows = transaction.select({
+                    id: user.id,
                     name: user.name,
+                    image: user.image,
                     count: sql<number>`coalesce(${counter.count}, 0)`,
                 })
                     .from(user)
@@ -115,8 +123,10 @@ export class CounterService {
                     userCount: userRow?.count ?? 0,
                     totalCount: globalRow?.count ?? 0,
                     leaderboard: leaderboardRows.map((entry, index) => ({
+                        id: entry.id,
                         rank: index + 1,
                         name: entry.name,
+                        image: entry.image,
                         count: entry.count,
                     })),
                 };

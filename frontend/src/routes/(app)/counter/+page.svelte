@@ -3,19 +3,21 @@
     import { getGatewayManager } from "$lib/gateway/gateway-context.svelte";
     import { api } from "$lib/api";
     import Button from "$lib/components/Button.svelte";
+    import ProfilePicture from "$lib/components/ProfilePicture.svelte";
+    import Username from "$lib/components/Username.svelte";
     import { setPageTitle } from "$lib/utils";
 
     const gateway = getGatewayManager();
     let userCount = $state<number | null>(null);
     let totalCount = $state<number | null>(null);
-    let leaderboard = $state<{ rank: number; name: string; count: number }[]>([]);
+    let leaderboard = $state<{ id: string; rank: number; name: string; image: string | null; count: number }[]>([]);
     let loading = $state(true);
     let errorMessage = $state<string | null>(null);
 
     function applyCounts(counts: {
         userCount: number;
         totalCount: number;
-        leaderboard: { rank: number; name: string; count: number }[];
+        leaderboard: { id: string; rank: number; name: string; image: string | null; count: number }[];
     }) {
         const isCurrentOrNewer = counts.totalCount >= (totalCount ?? 0);
         userCount = Math.max(userCount ?? 0, counts.userCount);
@@ -119,10 +121,11 @@
             <p class="py-4 text-center text-surface-600-400">Noch keine Spieler.</p>
         {:else}
             <ol class="divide-y divide-surface-300-700/40">
-                {#each leaderboard as entry (entry.rank)}
+                {#each leaderboard as entry (entry.id)}
                     <li class="flex items-center gap-4 py-3">
                         <span class="w-8 text-sm font-semibold tabular-nums text-surface-600-400">#{entry.rank}</span>
-                        <span class="min-w-0 flex-1 truncate font-medium text-surface-950-50">{entry.name}</span>
+                        <ProfilePicture image={entry.image} name={entry.name} size="h-8 w-8" class="border border-surface-300-700/40" />
+                        <Username userId={entry.id} name={entry.name} class="min-w-0 flex-1 truncate font-medium text-surface-950-50" />
                         <span class="text-sm tabular-nums text-surface-600-400">{entry.count} {entry.count === 1 ? "Klick" : "Klicks"}</span>
                     </li>
                 {/each}

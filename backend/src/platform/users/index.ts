@@ -15,6 +15,7 @@ function toUserProfile(
         email: 'email' in userData ? userData.email : isCurrentUser ? currentUser.email : undefined,
         emailVerified: 'emailVerified' in userData ? userData.emailVerified : isCurrentUser ? currentUser.emailVerified : undefined,
         image: userData.image,
+        createdAt: userData.createdAt,
         isAdmin: isCurrentUser && currentUser.isAdmin,
     };
 }

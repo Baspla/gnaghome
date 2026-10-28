@@ -27,4 +27,4 @@ export const userRelations = relations(user, ({ many }) => ({
 
 export type User = typeof user.$inferSelect;
 
-export type RedactedUser = Pick<User, 'id' | 'name' | 'image'>;
+export type RedactedUser = Pick<User, 'id' | 'name' | 'image' | 'createdAt'>;

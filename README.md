@@ -22,6 +22,7 @@ This application is intended for a small, trusted group. Review the data each co
 
 ## Deployment
 Die App wird bei jedem Commit automatisch als Docker Image gebaut und ist im GitHub Container Registry verfügbar.
+Nach erfolgreichem Build der Images ruft der Workflow bei Änderungen auf `main` den Produktions-Webhook per HTTP POST auf. Hinterlege dessen URL als GitHub-Repository-Secret `PRODUCTION_DEPLOY_WEBHOOK_URL`; Pull Requests lösen keinen Produktions-Deploy aus.
 Die Compose Datei für das Deployment ist in docker-compose.yml zu finden.
 Diese Datei sollte up-to-date mit meinem aktuellen Deployment sein, spezifische Anpassungen hinsichtlich Netzwerk, Ports, Volumes und Secrets müssen eventuell noch gemacht werden.
 

@@ -17,11 +17,17 @@ const sessionUser = {
 };
 
 let session: Awaited<ReturnType<AppDependencies['getSession']>> = null;
-const getUserAsUser = mock(async () => ok({ id: 'user-1', name: 'Test User', image: null }));
+const profileCreatedAt = new Date('2025-12-31T23:00:00.000Z');
+const getUserAsUser = mock(async (_currentUserId: string, targetUserId: string) => ok({
+    id: targetUserId,
+    name: 'Test User',
+    image: null,
+    createdAt: profileCreatedAt,
+}));
 const counterResponse = {
     userCount: 2,
     totalCount: 7,
-    leaderboard: [{ rank: 1, name: 'Test User', count: 2 }],
+    leaderboard: [{ id: 'user-1', rank: 1, name: 'Test User', image: null, count: 2 }],
 };
 const getCounterCounts = mock(async (_userId: string) => ok(counterResponse));
 const incrementCounter = mock(async (_userId: string) => ok({ ...counterResponse, userCount: 3, totalCount: 8 }));
@@ -120,6 +126,7 @@ describe('backend HTTP app', () => {
             email: 'user@example.test',
             emailVerified: true,
             image: null,
+            createdAt: profileCreatedAt.toISOString(),
             isAdmin: false,
         });
         expect(getUserAsUser).toHaveBeenCalledWith('user-1', 'user-1');
@@ -136,6 +143,7 @@ describe('backend HTTP app', () => {
             email: 'user@example.test',
             emailVerified: true,
             image: null,
+            createdAt: profileCreatedAt.toISOString(),
             isAdmin: true,
         });
     });
@@ -148,6 +156,22 @@ describe('backend HTTP app', () => {
         const profile = await response.json();
         expect(profile).toMatchObject({ id: 'user-1', isAdmin: true });
         expect(profile).not.toHaveProperty('groups');
+    });
+
+    it('includes public profile fields and creation time for another user without exposing private fields', async () => {
+        session = { user: sessionUser, session: { id: 'session-1' } };
+
+        const response = await makeTestApp().handle(new Request('http://localhost/api/v1/users/user-2'));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            id: 'user-2',
+            name: 'Test User',
+            image: null,
+            createdAt: profileCreatedAt.toISOString(),
+            isAdmin: false,
+        });
+        expect(getUserAsUser).toHaveBeenCalledWith('user-1', 'user-2');
     });
 
 });

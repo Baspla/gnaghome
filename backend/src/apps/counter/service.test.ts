@@ -57,7 +57,7 @@ describe('CounterService', () => {
 
     it('returns a ranked leaderboard with all registered users ordered by their personal counts', async () => {
         await database.db.insert(user).values([
-            { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
+            { id: 'user-1', name: 'Alice', email: 'alice@example.test', image: 'https://example.test/alice.png' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
             { id: 'user-3', name: 'Casey', email: 'casey@example.test' },
         ]);
@@ -65,9 +65,9 @@ describe('CounterService', () => {
             ok: true,
             value: {
                 leaderboard: [
-                    { rank: 1, name: 'Alice', count: 1 },
-                    { rank: 2, name: 'Bob', count: 0 },
-                    { rank: 3, name: 'Casey', count: 0 },
+                    { id: 'user-1', rank: 1, name: 'Alice', image: 'https://example.test/alice.png', count: 1 },
+                    { id: 'user-2', rank: 2, name: 'Bob', image: null, count: 0 },
+                    { id: 'user-3', rank: 3, name: 'Casey', image: null, count: 0 },
                 ],
             },
         });
@@ -75,9 +75,9 @@ describe('CounterService', () => {
             ok: true,
             value: {
                 leaderboard: [
-                    { rank: 1, name: 'Alice', count: 2 },
-                    { rank: 2, name: 'Bob', count: 0 },
-                    { rank: 3, name: 'Casey', count: 0 },
+                    { id: 'user-1', rank: 1, name: 'Alice', image: 'https://example.test/alice.png', count: 2 },
+                    { id: 'user-2', rank: 2, name: 'Bob', image: null, count: 0 },
+                    { id: 'user-3', rank: 3, name: 'Casey', image: null, count: 0 },
                 ],
             },
         });
@@ -85,9 +85,9 @@ describe('CounterService', () => {
             ok: true,
             value: {
                 leaderboard: [
-                    { rank: 1, name: 'Alice', count: 2 },
-                    { rank: 2, name: 'Bob', count: 1 },
-                    { rank: 3, name: 'Casey', count: 0 },
+                    { id: 'user-1', rank: 1, name: 'Alice', image: 'https://example.test/alice.png', count: 2 },
+                    { id: 'user-2', rank: 2, name: 'Bob', image: null, count: 1 },
+                    { id: 'user-3', rank: 3, name: 'Casey', image: null, count: 0 },
                 ],
             },
         });
@@ -100,9 +100,9 @@ describe('CounterService', () => {
                 userCount: 1,
                 totalCount: 3,
                 leaderboard: [
-                    { rank: 1, name: 'Alice', count: 2 },
-                    { rank: 2, name: 'Bob', count: 1 },
-                    { rank: 3, name: 'Casey', count: 0 },
+                    { id: 'user-1', rank: 1, name: 'Alice', image: 'https://example.test/alice.png', count: 2 },
+                    { id: 'user-2', rank: 2, name: 'Bob', image: null, count: 1 },
+                    { id: 'user-3', rank: 3, name: 'Casey', image: null, count: 0 },
                 ],
             },
         });

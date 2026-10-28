@@ -15,7 +15,7 @@ This roadmap describes the intended apps, shared platform systems, and integrati
 
 ## Shared platform systems
 
-- [ ] **Profiles** — Provide shared user-profile data and presentation. Build on the existing local user identity/profile foundation rather than creating a second identity system. Use consistent reusable user and avatar components now so future profile customization can be added without replacing every app's UI.
+- [x] **Profiles** — Initial profile presentation is implemented on the existing local user identity/profile foundation: authenticated `/profile/<id>` pages show the user's profile picture, name, and account creation date, with reusable `Username` and `ProfilePicture` components. Further profile customization remains future work.
 - [ ] **Files** — Provide a shared way to upload and retrieve files, initially supporting concrete app needs such as CrewNow images. Decide whether this should remain resource-scoped media or grow into shared folders and general-purpose file storage; do not assume a full file drive is needed.
 - [ ] **Tasks** — Provide durable asynchronous jobs for work such as fetching a Steam data snapshot, including the appropriate persistence, retry, and failure visibility for a small self-hosted deployment.
 - [ ] **Activity feed** — Provide a central feed of user actions from Gnaghome apps, such as someone posting a CrewNow image. Feed items should link to their originating app objects and be shown only where the viewer is authorized to access them.
