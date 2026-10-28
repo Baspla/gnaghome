@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { createDatabase } from '../../db/connection';
 import { ok } from '../../lib/result';
+import { user } from '../../platform/users/schema';
 import { counter } from './schema';
 import { CounterService } from './service';
 
@@ -20,7 +21,7 @@ describe('CounterService', () => {
     it('returns zero counts for a new user and initializes the shared total', async () => {
         const result = await service.getCounts('user-1');
 
-        expect(result).toEqual({ ok: true, value: { userCount: 0, totalCount: 0 } });
+        expect(result).toEqual({ ok: true, value: { userCount: 0, totalCount: 0, leaderboard: [] } });
         expect(await database.db.select().from(counter).all()).toEqual([
             { id: 'global:counter', count: 0 },
             { id: 'user:user-1', count: 0 },
@@ -30,7 +31,7 @@ describe('CounterService', () => {
     it('increments both counts and broadcasts the changed global count', async () => {
         const result = await service.increment('user-1');
 
-        expect(result).toEqual({ ok: true, value: { userCount: 1, totalCount: 1 } });
+        expect(result).toEqual({ ok: true, value: { userCount: 1, totalCount: 1, leaderboard: [] } });
         expect(broadcast).toHaveBeenCalledTimes(1);
         expect(broadcast.mock.calls[0]?.[0]).toEqual(['public:counter']);
         expect(broadcast.mock.calls[0]?.[1]).toMatchObject({
@@ -46,11 +47,64 @@ describe('CounterService', () => {
 
         expect(await service.getCounts('user-1')).toEqual({
             ok: true,
-            value: { userCount: 2, totalCount: 3 },
+            value: { userCount: 2, totalCount: 3, leaderboard: [] },
         });
         expect(await service.getCounts('user-2')).toEqual({
             ok: true,
-            value: { userCount: 1, totalCount: 3 },
+            value: { userCount: 1, totalCount: 3, leaderboard: [] },
+        });
+    });
+
+    it('returns a ranked leaderboard with all registered users ordered by their personal counts', async () => {
+        await database.db.insert(user).values([
+            { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
+            { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
+            { id: 'user-3', name: 'Casey', email: 'casey@example.test' },
+        ]);
+        expect((await service.increment('user-1'))).toMatchObject({
+            ok: true,
+            value: {
+                leaderboard: [
+                    { rank: 1, name: 'Alice', count: 1 },
+                    { rank: 2, name: 'Bob', count: 0 },
+                    { rank: 3, name: 'Casey', count: 0 },
+                ],
+            },
+        });
+        expect((await service.increment('user-1'))).toMatchObject({
+            ok: true,
+            value: {
+                leaderboard: [
+                    { rank: 1, name: 'Alice', count: 2 },
+                    { rank: 2, name: 'Bob', count: 0 },
+                    { rank: 3, name: 'Casey', count: 0 },
+                ],
+            },
+        });
+        expect((await service.increment('user-2'))).toMatchObject({
+            ok: true,
+            value: {
+                leaderboard: [
+                    { rank: 1, name: 'Alice', count: 2 },
+                    { rank: 2, name: 'Bob', count: 1 },
+                    { rank: 3, name: 'Casey', count: 0 },
+                ],
+            },
+        });
+
+        const result = await service.getCounts('user-2');
+
+        expect(result).toEqual({
+            ok: true,
+            value: {
+                userCount: 1,
+                totalCount: 3,
+                leaderboard: [
+                    { rank: 1, name: 'Alice', count: 2 },
+                    { rank: 2, name: 'Bob', count: 1 },
+                    { rank: 3, name: 'Casey', count: 0 },
+                ],
+            },
         });
     });
 
@@ -62,11 +116,11 @@ describe('CounterService', () => {
 
         expect(await service.increment('user-1')).toEqual({
             ok: true,
-            value: { userCount: 1, totalCount: 1 },
+            value: { userCount: 1, totalCount: 1, leaderboard: [] },
         });
         expect(await service.getCounts('user-1')).toEqual({
             ok: true,
-            value: { userCount: 1, totalCount: 1 },
+            value: { userCount: 1, totalCount: 1, leaderboard: [] },
         });
     });
 
@@ -75,7 +129,7 @@ describe('CounterService', () => {
 
         expect(await service.increment('user-1')).toEqual({
             ok: true,
-            value: { userCount: 1, totalCount: 1 },
+            value: { userCount: 1, totalCount: 1, leaderboard: [] },
         });
     });
 });

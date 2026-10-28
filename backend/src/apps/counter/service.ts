@@ -1,6 +1,7 @@
-import { eq, sql } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { counter } from './schema';
+import { user } from '../../platform/users/schema';
 import { err, ok, type InternalError, type Result } from '../../lib/result';
 import type { BroadcastPublisher } from '../../platform/realtime/service';
 import { createLogger } from '../../lib/logger';
@@ -14,6 +15,13 @@ const counterRowId = (userId: string) => `user:${userId}`;
 export type CounterCounts = {
     userCount: number;
     totalCount: number;
+    leaderboard: LeaderboardEntry[];
+};
+
+export type LeaderboardEntry = {
+    rank: number;
+    name: string;
+    count: number;
 };
 
 export class CounterService {
@@ -41,9 +49,23 @@ export class CounterService {
                     .where(eq(counter.id, GLOBAL_COUNTER_ID))
                     .get();
 
+                const leaderboardRows = transaction.select({
+                    name: user.name,
+                    count: sql<number>`coalesce(${counter.count}, 0)`,
+                })
+                    .from(user)
+                    .leftJoin(counter, eq(counter.id, sql`'user:' || ${user.id}`))
+                    .orderBy(desc(sql`coalesce(${counter.count}, 0)`), asc(user.name))
+                    .all();
+
                 return {
                     userCount: userRow?.count ?? 0,
                     totalCount: globalRow?.count ?? 0,
+                    leaderboard: leaderboardRows.map((entry, index) => ({
+                        rank: index + 1,
+                        name: entry.name,
+                        count: entry.count,
+                    })),
                 };
             });
             return ok(counts);
@@ -80,10 +102,23 @@ export class CounterService {
                     .from(counter)
                     .where(eq(counter.id, GLOBAL_COUNTER_ID))
                     .get();
+                const leaderboardRows = transaction.select({
+                    name: user.name,
+                    count: sql<number>`coalesce(${counter.count}, 0)`,
+                })
+                    .from(user)
+                    .leftJoin(counter, eq(counter.id, sql`'user:' || ${user.id}`))
+                    .orderBy(desc(sql`coalesce(${counter.count}, 0)`), asc(user.name))
+                    .all();
 
                 return {
                     userCount: userRow?.count ?? 0,
                     totalCount: globalRow?.count ?? 0,
+                    leaderboard: leaderboardRows.map((entry, index) => ({
+                        rank: index + 1,
+                        name: entry.name,
+                        count: entry.count,
+                    })),
                 };
             }, { behavior: 'immediate' });
         } catch (error) {

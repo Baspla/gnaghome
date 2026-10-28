@@ -18,8 +18,13 @@ const sessionUser = {
 
 let session: Awaited<ReturnType<AppDependencies['getSession']>> = null;
 const getUserAsUser = mock(async () => ok({ id: 'user-1', name: 'Test User', image: null }));
-const getCounterCounts = mock(async (_userId: string) => ok({ userCount: 2, totalCount: 7 }));
-const incrementCounter = mock(async (_userId: string) => ok({ userCount: 3, totalCount: 8 }));
+const counterResponse = {
+    userCount: 2,
+    totalCount: 7,
+    leaderboard: [{ rank: 1, name: 'Test User', count: 2 }],
+};
+const getCounterCounts = mock(async (_userId: string) => ok(counterResponse));
+const incrementCounter = mock(async (_userId: string) => ok({ ...counterResponse, userCount: 3, totalCount: 8 }));
 
 function makeTestApp() {
     return createApp({
@@ -98,9 +103,9 @@ describe('backend HTTP app', () => {
         const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
 
         expect(readResponse.status).toBe(200);
-        expect(await readResponse.json()).toEqual({ userCount: 2, totalCount: 7 });
+        expect(await readResponse.json()).toEqual(counterResponse);
         expect(incrementResponse.status).toBe(200);
-        expect(await incrementResponse.json()).toEqual({ userCount: 3, totalCount: 8 });
+        expect(await incrementResponse.json()).toEqual({ ...counterResponse, userCount: 3, totalCount: 8 });
         expect(getCounterCounts).toHaveBeenCalledWith('user-1');
         expect(incrementCounter).toHaveBeenCalledWith('user-1');
     });
