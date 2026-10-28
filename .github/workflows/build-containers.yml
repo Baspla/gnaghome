@@ -9,6 +9,10 @@ on:
       - shared/**
       - bun.lock
       - package.json
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - .dockerignore
+      - .github/workflows/backend-tests.yml
       - .github/workflows/build-containers.yml
   pull_request:
     paths:
@@ -17,6 +21,10 @@ on:
       - shared/**
       - bun.lock
       - package.json
+      - backend/Dockerfile
+      - frontend/Dockerfile
+      - .dockerignore
+      - .github/workflows/backend-tests.yml
       - .github/workflows/build-containers.yml
 
 env:
@@ -24,9 +32,16 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  test:
+    name: Run backend tests
+    uses: ./.github/workflows/backend-tests.yml
+    permissions:
+      contents: read
+
   build:
     name: Build ${{ matrix.service }} image
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
       packages: write

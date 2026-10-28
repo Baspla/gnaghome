@@ -1,20 +1,7 @@
 name: Backend Tests
 
 on:
-  push:
-    paths:
-      - backend/**
-      - shared/**
-      - bun.lock
-      - package.json
-      - .github/workflows/backend-tests.yml
-  pull_request:
-    paths:
-      - backend/**
-      - shared/**
-      - bun.lock
-      - package.json
-      - .github/workflows/backend-tests.yml
+  workflow_call:
 
 jobs:
   test:
