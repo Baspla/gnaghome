@@ -40,7 +40,7 @@ export const handleError: HandleServerError = ({ error, event, status }) => {
 	// dont log 4xx errors, they are expected to happen sometimes
 	if (status >= 400 && status < 500) {
 		return {
-			message: 'An unexpected 4xx error occurred',
+			message: `An unexpected ${status} error occurred`,
 		};
 	}
 	console.error(`[server-error] ${event.request.method} ${event.url.pathname}`, error);

@@ -18,6 +18,8 @@ const sessionUser = {
 
 let session: Awaited<ReturnType<AppDependencies['getSession']>> = null;
 const getUserAsUser = mock(async () => ok({ id: 'user-1', name: 'Test User', image: null }));
+const getCounterCounts = mock(async (_userId: string) => ok({ userCount: 2, totalCount: 7 }));
+const incrementCounter = mock(async (_userId: string) => ok({ userCount: 3, totalCount: 8 }));
 
 function makeTestApp() {
     return createApp({
@@ -25,6 +27,7 @@ function makeTestApp() {
         authHandler: async () => new Response('test auth handler'),
         adminGroupName: 'admins',
         userService: { getUserAsUser },
+        counterService: { getCounts: getCounterCounts, increment: incrementCounter },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });
@@ -34,6 +37,8 @@ describe('backend HTTP app', () => {
     beforeEach(() => {
         session = null;
         getUserAsUser.mockClear();
+        getCounterCounts.mockClear();
+        incrementCounter.mockClear();
     });
 
     it('builds an in-process app from injected test dependencies', () => {
@@ -72,6 +77,32 @@ describe('backend HTTP app', () => {
         const response = await makeTestApp().handle(new Request('http://localhost/api/v1/users/me'));
         expect(response.status).toBe(401);
         expect(getUserAsUser).not.toHaveBeenCalled();
+    });
+
+    it('requires authentication to read and increment the counter', async () => {
+        const app = makeTestApp();
+        const readResponse = await app.handle(new Request('http://localhost/api/v1/counter'));
+        const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
+
+        expect(readResponse.status).toBe(401);
+        expect(incrementResponse.status).toBe(401);
+        expect(getCounterCounts).not.toHaveBeenCalled();
+        expect(incrementCounter).not.toHaveBeenCalled();
+    });
+
+    it('returns the authenticated user’s counts and increments only that user', async () => {
+        session = { user: sessionUser, session: { id: 'session-1' } };
+        const app = makeTestApp();
+
+        const readResponse = await app.handle(new Request('http://localhost/api/v1/counter'));
+        const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
+
+        expect(readResponse.status).toBe(200);
+        expect(await readResponse.json()).toEqual({ userCount: 2, totalCount: 7 });
+        expect(incrementResponse.status).toBe(200);
+        expect(await incrementResponse.json()).toEqual({ userCount: 3, totalCount: 8 });
+        expect(getCounterCounts).toHaveBeenCalledWith('user-1');
+        expect(incrementCounter).toHaveBeenCalledWith('user-1');
     });
 
     it('passes the authenticated user to the user service', async () => {

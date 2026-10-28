@@ -28,8 +28,10 @@ Retiring a feature does not imply immediately dropping its database tables. Pres
 
 - A shared authenticated-user context and conventions for module-owned authorization checks.
 - Linked external-service accounts, kept distinct from OIDC login accounts.
-- Durable normalized user activity suitable for a cross-service feed.
-- Notifications, comments on supported dashboard items, and a shared media/upload service as concrete use cases require them.
+- A central feed of app-generated activity, with entries referencing the originating app objects and access governed by those apps.
+- A durable audit log of changes across apps and platform systems, including create/update/delete actions. This is separate from social feed and provider activity; only admins may read audit records, with authorization enforced by the backend.
+- Durable normalized activity collected from external services for consumers such as Stats; this is distinct from app-generated feed events.
+- Notifications, comments and reactions on supported dashboard items, and a shared media/upload service as concrete use cases require them. When an object appears in the feed and on its app page, both views use the same canonical comments and reactions rather than separate copies.
 - A persistent background-job mechanism for provider polling/sync, retries, upload processing, and related asynchronous work.
 
 ## Backend organization
@@ -60,9 +62,9 @@ The current active modules have been grouped under `platform/auth`, `platform/us
 
 ## Integration and data boundaries
 
-Each provider integration owns its API calls, credential handling, rate limits, cursors, and provider-specific records. Integrations contribute normalized activity or request notifications through explicit platform services/contracts; they do not write directly into another module's tables.
+Each provider integration owns its API calls, credential handling, rate limits, cursors, and provider-specific records. Integrations contribute normalized external activity or request notifications through explicit platform services/contracts; they do not write directly into another module's tables. App-generated feed events are a separate source of activity: apps publish them through a platform contract, and feed entries reference app-owned objects rather than replacing or duplicating those objects. Audit records are a separate administrative trail of changes; app and platform operations should record relevant create/update/delete actions through a shared contract, and audit-log reads must be restricted to admins by backend authorization.
 
-Model cross-service activity with a small common envelope (for example: actor, source/provider, event type, occurred-at time, and a reference or validated payload for provider-specific details). Keep provider-specific information available without forcing unrelated services into a single oversized schema. A user-defined arbitrary collection system is not a prerequisite; introduce it only when a concrete use case establishes its ownership, validation, and access rules.
+Model externally collected activity with a small common envelope (for example: actor, source/provider, event type, occurred-at time, and a reference or validated payload for provider-specific details). Keep provider-specific information available without forcing unrelated services into a single oversized schema. A user-defined arbitrary collection system is not a prerequisite; introduce it only when a concrete use case establishes its ownership, validation, and access rules. For app-generated feed items, preserve a stable reference to the originating object so feed and object-page views can resolve the same object and its shared comments/reactions under the owning app's authorization rules.
 
 Use a job queue for work to perform (for example, “sync Steam activity”), and activity records for the results (for example, “Steam reported this user started a game”). Start with persistence appropriate to the existing SQLite deployment and a worker alongside the backend; do not add separate queue infrastructure before workload justifies it. Jobs should be retryable, safe to rerun, and respectful of provider rate limits.
 
@@ -95,7 +97,7 @@ OIDC group claims remain available on the authenticated backend user for module-
 - The `/users/me` response exposes `isAdmin`; it is presentation data and does not secure other routes by itself.
 - This remains foundational plumbing: future dashboard resource modules still need to implement and test their own user-scoped ownership/sharing rules.
 - Chat and LiveKit API modules, frontend flows, and provider dependencies have been removed. Legacy database schema declarations remain registered so existing tables are preserved and Drizzle will not infer destructive drops.
-- Centrifugo remains active. Its client/server payload contract is now a generic platform-event envelope; there are not yet dashboard activity or notification event producers.
+- Centrifugo remains active. Its client/server payload contract is a typed, discriminated platform-event union. The counter app is the first producer; dashboard activity and notification event producers have not yet been implemented.
 
 ## Centrifugo and frontend reactivity
 
@@ -103,7 +105,11 @@ Keep Centrifugo as the realtime transport. Reframe its event vocabulary from cha
 
 Durable database state remains canonical. A Centrifugo event tells a client that its view may need updating; it is not the only copy of a change. On reconnect or suspected missed events, the client can fetch canonical state through the API. Consider a database-backed outbox if reliable publication across database writes and process failures becomes necessary.
 
-The existing per-user channel is a reasonable simple starting point. Add more narrowly scoped subscriptions only when needed, with authorization enforced by the server.
+Per-user channels (`user:<userId>`) remain the default for user-scoped updates. A shared channel is appropriate when an app needs group-wide updates, but the server must explicitly authorize it in the authenticated Centrifugo token. The counter currently uses `counter:global`; do not treat a shared channel name as authorization by itself.
+
+### Current typed-event implementation
+
+The shared realtime DTO lives in `shared/dto/platform-event.ts`. Define each event as a dedicated payload schema/type and event schema/type with a literal `type`, then add it as a variant in `PlatformEventSchema`; do not widen event names to arbitrary strings or payloads to `unknown`. The current union contains `counter.changed` with a typed `totalCount` payload. The frontend validates untrusted Centrifugo publications in `shared/dto/platform-event-validation.ts` before dispatching them, and the backend broadcast publisher accepts only `PlatformEvent`. Add focused tests for accepted payloads and rejection of unknown event names or malformed payloads whenever adding a new event variant.
 
 ## UI direction
 
@@ -118,8 +124,8 @@ Apps can expose whichever views suit their use cases—for example activity, ser
 1. Agree on the first dashboard use case and first integration; use it to validate the activity shape and product navigation.
 2. Detach voice/chat from the active product while retaining useful auth, profile, settings, and deployment foundations. Keep shared foundations under `platform/`; add future product areas under `apps/` and provider connectors under `integrations/`.
 3. Migrate dashboard modules to user-scoped operations with module-owned owner/share checks; test authorization denial and allowed cases before exposing protected data.
-4. Implement one end-to-end integration flow: scheduled/background sync → persisted activity → API read → Centrifugo update → frontend refresh/update.
-5. Add comments, uploads, notifications, and richer collections only against concrete dashboard objects/use cases, reusing shared platform services.
+4. Implement one end-to-end integration flow: scheduled/background sync → persisted external activity → API read → Centrifugo update → frontend refresh/update.
+5. Add app-generated feed events for concrete app actions, and add comments, reactions, uploads, notifications, audit logging, and richer collections only against concrete dashboard objects/use cases, reusing shared platform services. Feed and object-page views must resolve comments and reactions against the same canonical target; audit records remain separate and admin-only.
 6. Add integrations incrementally; defer service splitting or extra infrastructure until operational evidence requires it.
 
 ## Open design questions
@@ -128,4 +134,5 @@ Apps can expose whichever views suit their use cases—for example activity, ser
 - Which OIDC group identifiers/claims does the deployed provider actually supply, and what exact group value should configure dashboard admins?
 - Are dashboard items shared across all users, scoped to OIDC groups, or a mixture?
 - What data should each integration retain, and what retention/deletion controls are expected?
+- Which app/platform actions and metadata belong in the audit log, what retention and integrity guarantees are needed, and how should sensitive data be excluded while ensuring only admins can read it?
 - Is local disk sufficient for media in the expected deployment, or is S3-compatible storage needed from the start?

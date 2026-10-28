@@ -2,6 +2,7 @@ import { page } from "$app/state";
 import { env } from "$env/dynamic/public";
 import { api } from "$lib/api";
 import type { PlatformEvent } from "$shared/dto/platform-event";
+import { isPlatformEvent } from "$shared/dto/platform-event-validation";
 import { Centrifuge, type PublicationContext } from "centrifuge";
 import { createLogger } from "$lib/logger";
 import { toaster } from "$lib/toaster";
@@ -9,6 +10,7 @@ import { toaster } from "$lib/toaster";
 const logger = createLogger("gateway");
 
 type PlatformEventHandler = (event: PlatformEvent) => void;
+type ConnectionHandler = () => void;
 
 export class GatewayManager {
     private getToken = async () => {
@@ -38,6 +40,8 @@ export class GatewayManager {
     );
 
     private handlers = new Set<PlatformEventHandler>();
+    private connectionHandlers = new Set<ConnectionHandler>();
+    private connected = false;
 
     /**
      * Register a handler for a specific event type.
@@ -46,6 +50,13 @@ export class GatewayManager {
     onEvent(handler: PlatformEventHandler): () => void {
         this.handlers.add(handler);
         return () => this.handlers.delete(handler);
+    }
+
+    /** Register a callback for initial connection and every successful reconnect. */
+    onConnected(handler: ConnectionHandler): () => void {
+        this.connectionHandlers.add(handler);
+        if (this.connected) handler();
+        return () => this.connectionHandlers.delete(handler);
     }
 
     connect() {
@@ -60,26 +71,40 @@ export class GatewayManager {
         });
         this.centrifuge.on("connected", (context) => {
             logger.info("Centrifugo connected");
+            this.connected = true;
             if (!this.userId) {
                 logger.error("no user ID found");
                 return;
             }
-            try {
-                const sub = this.centrifuge.newSubscription("user:" + this.userId, {
-                    getToken: this.getToken,
-                })
-                sub.subscribe();
-                sub.on("publication", (context: PublicationContext) => {
-                    this.handlePlatformEvent(context.data as PlatformEvent);
-                });
-            } catch (error) {
-                logger.error("failed to subscribe to user channel", { userId: this.userId, error: String(error) });
-            }
+            this.subscribeToChannel("user:" + this.userId);
+            this.subscribeToChannel("counter:global");
+            for (const handler of this.connectionHandlers) handler();
         });
         this.centrifuge.on("disconnected", (context) => {
+            this.connected = false;
             logger.info("Centrifugo disconnected");
         });
         this.centrifuge.connect();
+    }
+
+    private subscribeToChannel(channel: string) {
+        const existing = this.centrifuge.getSubscription(channel);
+        if (existing) return;
+
+        try {
+            const sub = this.centrifuge.newSubscription(channel, { getToken: this.getToken });
+            sub.on("publication", (context: PublicationContext) => {
+                if (isPlatformEvent(context.data)) {
+                    this.handlePlatformEvent(context.data);
+                    return;
+                }
+
+                logger.warn("received invalid platform event", { channel });
+            });
+            sub.subscribe();
+        } catch (error) {
+            logger.error("failed to subscribe to channel", { channel, error: String(error) });
+        }
     }
 
     private handlePlatformEvent(event: PlatformEvent) {

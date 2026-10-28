@@ -3,14 +3,21 @@ import { createDatabase } from './db/connection';
 import { createServices } from './services';
 import { createRealtimeModule } from './platform/realtime';
 import { createAuth } from './platform/auth/service';
-import { generateCentrifugoToken } from './platform/realtime/service';
+import {
+    createBroadcastPublisher,
+    createCentrifugoPublisher,
+    generateCentrifugoToken,
+} from './platform/realtime/service';
 import { createLogger } from './lib/logger';
 import { env } from './env';
 
 const logger = createLogger('app');
 const database = await createDatabase(env.DATABASE_URL, `${import.meta.dir}/../drizzle`);
-const services = createServices(database.db);
-const { users: userService } = services;
+const broadcast = createBroadcastPublisher(
+    createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
+);
+const services = createServices(database.db, broadcast);
+const { users: userService, counter: counterService } = services;
 const auth = createAuth(database.db, userService);
 
 const app = createApp({
@@ -18,6 +25,7 @@ const app = createApp({
     authHandler: (request) => auth.handler(request),
     adminGroupName: env.ADMIN_GROUP_NAME,
     userService,
+    counterService,
     realtimeModule: createRealtimeModule,
     generateRealtimeToken: generateCentrifugoToken,
 }).listen(3000);

@@ -7,11 +7,15 @@ import { ok, err, type Result, type InternalError } from '../../lib/result';
 
 const logger = createLogger('realtime');
 
-export type CentrifugoPublisher = (path: string, payload: unknown) => Promise<Response>;
+export type CentrifugoBroadcastPayload = {
+    channels: string[];
+    data: PlatformEvent;
+};
+export type CentrifugoPublisher = (payload: CentrifugoBroadcastPayload) => Promise<Response>;
 export type BroadcastPublisher = (channels: string[], data: PlatformEvent) => Promise<Result<null, InternalError>>;
 
 export async function generateCentrifugoToken(user: User, deviceId: string): Promise<Result<string, InternalError>> {
-    const channels = [`user:${user.id}`, `device:${user.id}:${deviceId}`, `presence`];
+    const channels = [`user:${user.id}`, `device:${user.id}:${deviceId}`, 'counter:global', 'presence'];
     return generateCentrifugoTokenForChannels(user, channels);
 }
 
@@ -39,9 +43,9 @@ export function createCentrifugoPublisher(
     apiKey: string,
     fetcher: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = fetch,
 ): CentrifugoPublisher {
-    return async (path, payload) => {
-        logger.debug('sending api message', { path });
-        const response = await fetcher(`${baseUrl}${path}`, {
+    return async (payload) => {
+        logger.debug('sending api broadcast');
+        const response = await fetcher(`${baseUrl}/api/broadcast`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -59,7 +63,7 @@ export function createBroadcastPublisher(publish: CentrifugoPublisher): Broadcas
     return async (channels, data) => {
         const broadcastPayload = { channels, data };
         try {
-            const response = await publish('/api/broadcast', broadcastPayload);
+            const response = await publish(broadcastPayload);
             if (!response.ok) {
                 logger.error('failed to broadcast message', { status: response.status, statusText: response.statusText });
                 return err({ status: 500, code: 'INTERNAL_ERROR', message: `Centrifugo broadcast failed: ${response.status} ${response.statusText}` });

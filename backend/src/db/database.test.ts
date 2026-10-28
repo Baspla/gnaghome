@@ -10,6 +10,9 @@ describe('SQLite integration', () => {
             expect(tables.map((table) => table.name)).toContain('message');
             expect(tables.map((table) => table.name)).toContain('channel_metadata');
             expect(tables.map((table) => table.name)).toContain('role');
+            expect(tables.map((table) => table.name)).toContain('counter');
+            const counterColumns = await db.all('PRAGMA table_info(counter)') as { name: string }[];
+            expect(counterColumns.map((column) => column.name)).toEqual(['id', 'count']);
         } finally {
             connection.close();
         }

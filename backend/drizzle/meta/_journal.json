@@ -8,6 +8,13 @@
       "when": 1793139117453,
       "tag": "0000_burly_the_order",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793146289214,
+      "tag": "0001_new_skaar",
+      "breakpoints": true
     }
   ]
 }

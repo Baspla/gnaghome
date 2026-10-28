@@ -3,6 +3,7 @@
     import UserControlPanel from "./UserControlPanel.svelte";
     import House from "@lucide/svelte/icons/house";
     import Folder from "@lucide/svelte/icons/folder";
+    import MousePointerClick from "@lucide/svelte/icons/mouse-pointer-click";
 </script>
 
 <aside
@@ -13,8 +14,8 @@
             <House class="h-5 w-5" />
         </IconSidebarElement>
 
-        <IconSidebarElement href="/services" label="Services" disabled>
-            <Folder class="h-5 w-5" />
+        <IconSidebarElement href="/counter" label="Counter">
+            <MousePointerClick class="h-5 w-5" />
         </IconSidebarElement>
     </nav>
 
