@@ -105,7 +105,7 @@ Keep Centrifugo as the realtime transport. Reframe its event vocabulary from cha
 
 Durable database state remains canonical. A Centrifugo event tells a client that its view may need updating; it is not the only copy of a change. On reconnect or suspected missed events, the client can fetch canonical state through the API. Consider a database-backed outbox if reliable publication across database writes and process failures becomes necessary.
 
-Per-user channels (`user:<userId>`) remain the default for user-scoped updates. A shared channel is appropriate when an app needs group-wide updates, but the server must explicitly authorize it in the authenticated Centrifugo token. The counter currently uses `counter:global`; do not treat a shared channel name as authorization by itself.
+Per-user channels (`user:<userId>`) remain the default for user-scoped updates. A shared channel is appropriate when an app needs group-wide updates; the server must explicitly authorize access through channel namespace policy or an authenticated Centrifugo token. The counter uses `public:counter`, matching the configured `public` namespace, whose `allow_subscribe_for_client` setting makes the global count visible to any connected Centrifugo client. Keep user-specific counts off this channel.
 
 ### Current typed-event implementation
 

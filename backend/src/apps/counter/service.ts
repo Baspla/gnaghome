@@ -5,6 +5,7 @@ import { err, ok, type InternalError, type Result } from '../../lib/result';
 import type { BroadcastPublisher } from '../../platform/realtime/service';
 import { createLogger } from '../../lib/logger';
 import type { CounterChangedEvent } from '$shared/dto/platform-event';
+import { RealtimeChannels } from '$shared/constants';
 
 const logger = createLogger('counter');
 const GLOBAL_COUNTER_ID = 'global:counter';
@@ -98,7 +99,7 @@ export class CounterService {
                 type: 'counter.changed',
                 data: { totalCount: counts.totalCount },
             };
-            const publishResult = await this.broadcast(['counter:global'], event);
+            const publishResult = await this.broadcast([RealtimeChannels.COUNTER], event);
             if (publishResult.ok) return ok(counts);
 
             logger.warn('counter changed but realtime notification failed', {

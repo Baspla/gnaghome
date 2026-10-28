@@ -5,6 +5,10 @@ export const Modules = {
     COUNTER: 'counter',
 } as const;
 
+export const RealtimeChannels = {
+    COUNTER: 'public:counter',
+} as const;
+
 export type ModuleId = typeof Modules[keyof typeof Modules]; 
 
 export const NotificationTypes = {

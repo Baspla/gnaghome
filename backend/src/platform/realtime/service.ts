@@ -2,6 +2,7 @@ import type { User } from 'better-auth';
 import * as jose from 'jose'
 import { env } from "../../env";
 import type { PlatformEvent } from '$shared/dto/platform-event';
+import { RealtimeChannels } from '$shared/constants';
 import { createLogger } from '../../lib/logger';
 import { ok, err, type Result, type InternalError } from '../../lib/result';
 
@@ -15,7 +16,7 @@ export type CentrifugoPublisher = (payload: CentrifugoBroadcastPayload) => Promi
 export type BroadcastPublisher = (channels: string[], data: PlatformEvent) => Promise<Result<null, InternalError>>;
 
 export async function generateCentrifugoToken(user: User, deviceId: string): Promise<Result<string, InternalError>> {
-    const channels = [`user:${user.id}`, `device:${user.id}:${deviceId}`, 'counter:global', 'presence'];
+    const channels = [`user:${user.id}`, `device:${user.id}:${deviceId}`, RealtimeChannels.COUNTER, 'presence'];
     return generateCentrifugoTokenForChannels(user, channels);
 }
 

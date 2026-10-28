@@ -27,7 +27,7 @@ describe('Centrifugo publisher', () => {
         if (!result.ok) return;
 
         const payload = await jose.jwtVerify(result.value, new TextEncoder().encode(env.CENTRIFUGO_SECRET));
-        expect(payload.payload.channels).toContain('counter:global');
+        expect(payload.payload.channels).toContain('public:counter');
         expect(payload.payload.channels).toContain('user:user-1');
     });
 

@@ -2,6 +2,7 @@ import { page } from "$app/state";
 import { env } from "$env/dynamic/public";
 import { api } from "$lib/api";
 import type { PlatformEvent } from "$shared/dto/platform-event";
+import { RealtimeChannels } from "$shared/constants";
 import { isPlatformEvent } from "$shared/dto/platform-event-validation";
 import { Centrifuge, type PublicationContext } from "centrifuge";
 import { createLogger } from "$lib/logger";
@@ -77,7 +78,7 @@ export class GatewayManager {
                 return;
             }
             this.subscribeToChannel("user:" + this.userId);
-            this.subscribeToChannel("counter:global");
+            this.subscribeToChannel(RealtimeChannels.COUNTER);
             for (const handler of this.connectionHandlers) handler();
         });
         this.centrifuge.on("disconnected", (context) => {

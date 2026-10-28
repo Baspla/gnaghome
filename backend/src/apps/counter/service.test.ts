@@ -32,7 +32,7 @@ describe('CounterService', () => {
 
         expect(result).toEqual({ ok: true, value: { userCount: 1, totalCount: 1 } });
         expect(broadcast).toHaveBeenCalledTimes(1);
-        expect(broadcast.mock.calls[0]?.[0]).toEqual(['counter:global']);
+        expect(broadcast.mock.calls[0]?.[0]).toEqual(['public:counter']);
         expect(broadcast.mock.calls[0]?.[1]).toMatchObject({
             type: 'counter.changed',
             data: { totalCount: 1 },
