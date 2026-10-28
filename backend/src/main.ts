@@ -10,8 +10,10 @@ import {
 } from './platform/realtime/service';
 import { createLogger } from './lib/logger';
 import { env } from './env';
+import { warnIfUsingInMemoryDatabase } from './db/persistence-warning';
 
 const logger = createLogger('app');
+warnIfUsingInMemoryDatabase(env.DATABASE_URL, process.env.NODE_ENV);
 const database = await createDatabase(env.DATABASE_URL, `${import.meta.dir}/../drizzle`);
 const broadcast = createBroadcastPublisher(
     createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
