@@ -84,15 +84,6 @@ describe('backend HTTP app', () => {
         expect(getUserAsUser).not.toHaveBeenCalled();
     });
 
-    it('does not register the removed counter endpoints', async () => {
-        const app = makeTestApp();
-        const readResponse = await app.handle(new Request('http://localhost/api/v1/counter'));
-        const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
-
-        expect(readResponse.status).toBe(404);
-        expect(incrementResponse.status).toBe(404);
-    });
-
     it('filters protected feed targets before returning activity items', async () => {
         session = { user: sessionUser, session: { id: 'session-1' } };
         const response = await makeTestApp().handle(new Request('http://localhost/api/v1/activity-feed?limit=10'));

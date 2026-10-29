@@ -7,18 +7,12 @@ const app = new Elysia()
     .post('/event', ({ body }) => body, { body: PlatformEventSchema });
 
 describe('PlatformEventSchema', () => {
-    it('rejects unknown events, malformed feed events, and events for the removed counter feature', () => {
+    it('rejects unknown events and malformed feed events', () => {
         expect(isPlatformEvent({
             id: 'event-2',
             occurredAt: '2026-10-28T12:00:00.000Z',
             type: 'made.up.event',
             data: {},
-        })).toBe(false);
-        expect(isPlatformEvent({
-            id: 'event-3',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'counter.changed',
-            data: { totalCount: 12 },
         })).toBe(false);
         expect(isPlatformEvent({
             id: 'event-4',

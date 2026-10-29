@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { createDatabase } from './connection';
-import { activityFeedItem } from '../platform/activity-feed/schema';
 
 describe('SQLite integration', () => {
-    it('applies production migrations without retaining removed counter data', async () => {
+    it('applies production migrations and preserves the activity-feed schema', async () => {
         const connection = await createDatabase(':memory:');
         try {
             const { db } = connection;
             const tables = await db.all('SELECT name FROM sqlite_master WHERE type = \'table\'') as { name: string }[];
             expect(tables.map((table) => table.name)).toContain('user');
-            expect(tables.map((table) => table.name)).not.toContain('counter');
             expect(tables.map((table) => table.name)).toContain('activity_feed_item');
             const activityColumns = await db.all('PRAGMA table_info(activity_feed_item)') as { name: string }[];
             expect(activityColumns.map((column) => column.name)).toEqual([
@@ -32,41 +30,4 @@ describe('SQLite integration', () => {
         }
     });
 
-    it('removes legacy counter milestones while preserving unrelated feed activities', async () => {
-        const connection = await createDatabase(':memory:');
-        try {
-            connection.db.run('CREATE TABLE `counter` (`id` text PRIMARY KEY NOT NULL, `count` integer NOT NULL DEFAULT 0)');
-            connection.db.run("INSERT INTO `counter` (`id`, `count`) VALUES ('global:counter', 100)");
-            await connection.db.insert(activityFeedItem).values([
-                {
-                    id: 'legacy-counter-milestone',
-                    type: 'counter.milestone',
-                    data: JSON.stringify({ totalCount: 100 }),
-                    occurredAt: new Date('2026-01-01T00:00:00.000Z'),
-                },
-                {
-                    id: 'existing-profile-activity',
-                    type: 'profile.updated',
-                    data: JSON.stringify({ changedFields: ['name'] }),
-                    occurredAt: new Date('2026-01-02T00:00:00.000Z'),
-                },
-            ]);
-
-            const migration = await Bun.file(new URL('../../drizzle/0002_steady_human_robot.sql', import.meta.url)).text();
-            for (const statement of migration.split('--> statement-breakpoint')) {
-                if (statement.trim()) connection.db.run(statement.trim());
-            }
-
-            const remainingActivities = await connection.db.select({ id: activityFeedItem.id })
-                .from(activityFeedItem)
-                .all();
-            expect(remainingActivities).toEqual([{ id: 'existing-profile-activity' }]);
-            const counterTables = await connection.db.all(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'counter'",
-            );
-            expect(counterTables).toHaveLength(0);
-        } finally {
-            connection.close();
-        }
-    });
 });

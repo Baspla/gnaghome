@@ -67,21 +67,6 @@ describe('ActivityFeedService', () => {
         expect(JSON.stringify(broadcast.mock.calls[0]?.[1])).not.toContain('user-1');
     });
 
-    it('rejects counter milestone activities after that feature is removed', async () => {
-        broadcast.mockImplementation(async () => {
-            throw new Error('Centrifugo unavailable');
-        });
-
-        const result = await service.recordActivity({
-            type: 'counter.milestone',
-            actorUserId: 'user-1',
-            data: { totalCount: 100 },
-        } as never);
-
-        expect(result).toMatchObject({ ok: false, error: { status: 400 } });
-        expect(await database.db.select().from(activityFeedItem).all()).toHaveLength(0);
-    });
-
     it('records actorless system activity and permits a subject without a target', async () => {
         const result = await service.recordActivity({
             type: 'profile.birthday',

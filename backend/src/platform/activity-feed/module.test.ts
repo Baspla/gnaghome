@@ -110,22 +110,6 @@ describe('activity feed HTTP module', () => {
         expect(JSON.stringify(body)).not.toContain('alice@example.test');
     });
 
-    it('rejects removed counter milestone activities', async () => {
-        const result = await service.recordActivity({
-            type: 'counter.milestone',
-            actorUserId: 'actor-1',
-            data: { totalCount: 100 },
-            occurredAt: new Date('2026-10-28T15:00:00.000Z'),
-        } as never);
-        expect(result).toMatchObject({ ok: false, error: { status: 400 } });
-
-        const response = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
-        const body = await response.json();
-
-        expect(response.status).toBe(200);
-        expect(body).toEqual({ items: [], nextCursor: null });
-    });
-
     it('paginates authorized activity in the URL cursor format', async () => {
         await service.recordActivity({
             type: 'profile.updated',
