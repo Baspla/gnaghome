@@ -2,18 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { createDatabase } from '../../db/connection';
 import { ok } from '../../lib/result';
 import { user } from '../../platform/users/schema';
+import { ActivityFeedService, activityFeedItem } from '../../platform/activity-feed';
 import { counter } from './schema';
 import { CounterService } from './service';
 
 describe('CounterService', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
     let broadcast: ReturnType<typeof mock>;
+    let activityFeed: ActivityFeedService;
     let service: CounterService;
 
     beforeEach(async () => {
         database = await createDatabase(':memory:');
         broadcast = mock(async () => ok(null));
-        service = new CounterService(database.db, broadcast);
+        activityFeed = new ActivityFeedService(database.db, async () => ok(null));
+        service = new CounterService(database.db, broadcast, activityFeed);
     });
 
     afterEach(() => database.close());
@@ -38,6 +41,33 @@ describe('CounterService', () => {
             type: 'counter.changed',
             data: { totalCount: 1 },
         });
+    });
+
+    it('records one activity item when a click crosses each global 100-click milestone', async () => {
+        await database.db.insert(user).values({ id: 'user-1', name: 'Alice', email: 'alice@example.test' });
+        await database.db.insert(counter).values([
+            { id: 'global:counter', count: 98 },
+            { id: 'user:user-1', count: 98 },
+        ]);
+
+        await service.increment('user-1');
+        expect(await database.db.select().from(activityFeedItem).all()).toHaveLength(0);
+
+        const hundredth = await service.increment('user-1');
+        expect(hundredth).toMatchObject({ ok: true, value: { totalCount: 100 } });
+        const milestones = await database.db.select().from(activityFeedItem).all();
+        expect(milestones).toHaveLength(1);
+        expect(milestones[0]).toMatchObject({
+            type: 'counter.milestone',
+            actorUserId: 'user-1',
+            subjectUserId: null,
+            targetType: null,
+            targetId: null,
+            data: JSON.stringify({ totalCount: 100 }),
+        });
+
+        await service.increment('user-1');
+        expect(await database.db.select().from(activityFeedItem).all()).toHaveLength(1);
     });
 
     it('keeps each user count separate while maintaining one global total', async () => {

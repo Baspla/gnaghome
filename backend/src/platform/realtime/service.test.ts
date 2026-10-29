@@ -12,7 +12,7 @@ const event: PlatformEvent = {
 };
 
 describe('Centrifugo publisher', () => {
-    it('includes the shared counter channel in authenticated realtime tokens', async () => {
+    it('includes shared application realtime channels in authenticated tokens', async () => {
         const user = {
             id: 'user-1',
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -28,6 +28,8 @@ describe('Centrifugo publisher', () => {
 
         const payload = await jose.jwtVerify(result.value, new TextEncoder().encode(env.CENTRIFUGO_SECRET));
         expect(payload.payload.channels).toContain('public:counter');
+        expect(payload.payload.channels).toContain('public:activity-feed');
+        expect(payload.payload.channels).toContain('public:activity-feed');
         expect(payload.payload.channels).toContain('user:user-1');
     });
 

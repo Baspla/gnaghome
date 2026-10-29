@@ -14,6 +14,12 @@ export function isPlatformEvent(value: unknown): value is PlatformEvent {
             const { totalCount } = data;
             return typeof totalCount === 'number' && Number.isSafeInteger(totalCount) && totalCount >= 0;
         }
+        case 'activity-feed.changed': {
+            return typeof event.data === 'object'
+                && event.data !== null
+                && !Array.isArray(event.data)
+                && Object.keys(event.data).length === 0;
+        }
         default:
             return false;
     }

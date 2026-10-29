@@ -3,9 +3,9 @@
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
 
     let { data }: PageProps = $props();
-    const joinedDate = $derived(new Intl.DateTimeFormat('en', {
+    const joinedDate = $derived(new Intl.DateTimeFormat('de-DE', {
         dateStyle: 'long',
-        timeZone: 'UTC',
+        timeZone: 'Europe/Berlin',
     }).format(new Date(data.profile.createdAt)));
 </script>
 

@@ -1,6 +1,6 @@
-# Gnaghome
+# Gnag Home
 
-Gnaghome is transitioning into a unified dashboard for services used by a small group. The goal is a self-hostable application, not a large public multi-tenant platform.
+Gnag Home is transitioning into a unified dashboard for services used by a small group. The goal is a self-hostable application, not a large public multi-tenant platform.
 
 ## Techstack
 - Backend: Bun, Elysia, Eden Treaty, Drizzle, SQLite, Better Auth

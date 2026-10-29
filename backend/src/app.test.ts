@@ -4,6 +4,7 @@ import { createApp, type AppDependencies } from './app';
 import { ok } from './lib/result';
 import { createAuthMiddleware } from './platform/auth';
 import { createRealtimeModule } from './platform/realtime';
+import type { ActivityFeedService } from './platform/activity-feed/service';
 
 const sessionUser = {
     id: 'user-1',
@@ -31,6 +32,7 @@ const counterResponse = {
 };
 const getCounterCounts = mock(async (_userId: string) => ok(counterResponse));
 const incrementCounter = mock(async (_userId: string) => ok({ ...counterResponse, userCount: 3, totalCount: 8 }));
+const getActivityFeed = mock<ActivityFeedService['getFeed']>(async () => ok({ items: [], nextCursor: null }));
 
 function makeTestApp() {
     return createApp({
@@ -39,6 +41,7 @@ function makeTestApp() {
         adminGroupName: 'admins',
         userService: { getUserAsUser },
         counterService: { getCounts: getCounterCounts, increment: incrementCounter },
+        activityFeedService: { getFeed: getActivityFeed },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });
@@ -50,6 +53,7 @@ describe('backend HTTP app', () => {
         getUserAsUser.mockClear();
         getCounterCounts.mockClear();
         incrementCounter.mockClear();
+        getActivityFeed.mockClear();
     });
 
     it('builds an in-process app from injected test dependencies', () => {
@@ -99,6 +103,28 @@ describe('backend HTTP app', () => {
         expect(incrementResponse.status).toBe(401);
         expect(getCounterCounts).not.toHaveBeenCalled();
         expect(incrementCounter).not.toHaveBeenCalled();
+    });
+
+    it('filters protected feed targets before returning activity items', async () => {
+        session = { user: sessionUser, session: { id: 'session-1' } };
+        const response = await makeTestApp().handle(new Request('http://localhost/api/v1/activity-feed?limit=10'));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ items: [], nextCursor: null });
+        expect(getActivityFeed).toHaveBeenCalledTimes(1);
+        const visibilityResolver = getActivityFeed.mock.calls[0]?.[2];
+        expect(visibilityResolver).toBeFunction();
+        expect(await visibilityResolver?.('user-1', {
+            id: 'item-1',
+            type: 'profile.updated',
+            actorUserId: 'user-1',
+            subjectUserId: 'user-1',
+            targetType: 'profile',
+            targetId: 'user-1',
+            data: { changedFields: ['name'] },
+            occurredAt: new Date(),
+            createdAt: new Date(),
+        } as never)).toBe(false);
     });
 
     it('returns the authenticated user’s counts and increments only that user', async () => {

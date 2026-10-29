@@ -7,6 +7,7 @@ import type { BroadcastPublisher } from '../../platform/realtime/service';
 import { createLogger } from '../../lib/logger';
 import type { CounterChangedEvent } from '$shared/dto/platform-event';
 import { RealtimeChannels } from '$shared/constants';
+import type { ActivityFeedService } from '../../platform/activity-feed';
 
 const logger = createLogger('counter');
 const GLOBAL_COUNTER_ID = 'global:counter';
@@ -30,6 +31,7 @@ export class CounterService {
     constructor(
         private readonly db: AppDatabase,
         private readonly broadcast: BroadcastPublisher,
+        private readonly activityFeed: Pick<ActivityFeedService, 'recordActivity'>,
     ) {}
 
     async getCounts(userId: string): Promise<Result<CounterCounts, InternalError>> {
@@ -134,6 +136,29 @@ export class CounterService {
         } catch (error) {
             logger.error('failed to increment counter', { userId, error: String(error) });
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to increment counter' });
+        }
+
+        if (counts.totalCount > 0 && counts.totalCount % 100 === 0) {
+            try {
+                const activityResult = await this.activityFeed.recordActivity({
+                    type: 'counter.milestone',
+                    actorUserId: userId,
+                    data: { totalCount: counts.totalCount },
+                });
+                if (!activityResult.ok) {
+                    logger.warn('counter milestone reached but activity record failed', {
+                        userId,
+                        totalCount: counts.totalCount,
+                        message: activityResult.error.message,
+                    });
+                }
+            } catch (error) {
+                logger.warn('counter milestone reached but activity record failed', {
+                    userId,
+                    totalCount: counts.totalCount,
+                    error: String(error),
+                });
+            }
         }
 
         // The database is canonical; a Centrifugo outage must not undo a click.
