@@ -2,7 +2,6 @@
     import IconSidebarElement from "./IconSidebarElement.svelte";
     import UserControlPanel from "./UserControlPanel.svelte";
     import Activity from "@lucide/svelte/icons/activity";
-    import MousePointerClick from "@lucide/svelte/icons/mouse-pointer-click";
     import Camera from "@lucide/svelte/icons/camera";
     import BookOpen from "@lucide/svelte/icons/book-open";
     import ChartNoAxesCombined from "@lucide/svelte/icons/chart-no-axes-combined";
@@ -20,10 +19,6 @@
     >
         <IconSidebarElement href="/" label="Aktivitäten">
             <Activity class="h-5 w-5" />
-        </IconSidebarElement>
-
-        <IconSidebarElement href="/counter" label="Counter">
-            <MousePointerClick class="h-5 w-5" />
         </IconSidebarElement>
 
         <IconSidebarElement href="/crewnow" label="CrewNow" disabled>

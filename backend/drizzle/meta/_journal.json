@@ -15,6 +15,13 @@
       "when": 1793230811487,
       "tag": "0001_mixed_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793295786040,
+      "tag": "0002_steady_human_robot",
+      "breakpoints": true
     }
   ]
 }

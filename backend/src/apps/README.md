@@ -1,6 +1,6 @@
 # Product apps
 
-Place user-facing dashboard domains here (for example Photos, Literature, or Calendar) as they are implemented. The initial counter proof of concept lives in `counter/`.
+Place user-facing dashboard domains here (for example Photos, Literature, or Calendar) as they are implemented.
 
 Each app owns its domain data, API operations, and authorization rules. Use user-scoped operations and keep ownership/sharing checks with the app that understands the resource. Reuse platform capabilities through explicit service contracts; do not make apps write directly into one another's tables.
 

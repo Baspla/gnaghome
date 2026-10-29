@@ -19,7 +19,6 @@ export async function generateCentrifugoToken(user: User, deviceId: string): Pro
     const channels = [
         `user:${user.id}`,
         `device:${user.id}:${deviceId}`,
-        RealtimeChannels.COUNTER,
         RealtimeChannels.ACTIVITY_FEED,
         'presence',
     ];

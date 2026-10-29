@@ -9,11 +9,11 @@
 
     type Activity = {
         id: string;
-        type: 'profile.updated' | 'profile.birthday' | 'counter.milestone';
+        type: 'profile.updated' | 'profile.birthday';
         actor: { id: string; name: string; image: string | null } | null;
         subject: { id: string; name: string; image: string | null } | null;
         target: { type: string; id: string } | null;
-        data: { changedFields?: Array<'name' | 'image'>; totalCount?: number };
+        data: { changedFields?: Array<'name' | 'image'> };
         occurredAt: string;
     };
 
@@ -36,7 +36,6 @@
 
     function activityDescription(activity: Activity): string {
         if (activity.type === 'profile.birthday') return 'hat heute Geburtstag.';
-        if (activity.type === 'counter.milestone') return `hat den gemeinsamen Clicker auf ${activity.data.totalCount ?? 0} Klicks gebracht.`;
         if (activity.actor?.id === activity.subject?.id) return 'hat das eigene Profil aktualisiert.';
         return 'hat das Profil aktualisiert.';
     }
@@ -133,9 +132,7 @@
                                         class="font-semibold text-surface-950-50"
                                     />
                                 {/if}
-                                {#if activity.type === 'counter.milestone'}
-                                    <span>{activityDescription(activity)}</span>
-                                {:else if activity.type === 'profile.updated' && activity.subject && activity.actor?.id !== activity.subject.id}
+                                {#if activity.type === 'profile.updated' && activity.subject && activity.actor?.id !== activity.subject.id}
                                     <span>hat das Profil von </span>
                                     <Username
                                         userId={activity.subject.id}

@@ -15,7 +15,6 @@ export const ACTIVITY_TYPES = [
     'profile.birthday',
     'games.game_added',
     'calendar.event_started',
-    'counter.milestone',
 ] as const;
 
 export type ActivityType = typeof ACTIVITY_TYPES[number];
@@ -26,7 +25,6 @@ export type ActivityDataByType = {
     'profile.birthday': Record<string, never>;
     'games.game_added': { gameId: string };
     'calendar.event_started': { title: string };
-    'counter.milestone': { totalCount: number };
 };
 
 export type ActivityTarget = {
@@ -69,12 +67,6 @@ export type RecordActivityInput =
         subjectUserId?: string | null;
         target: ActivityTarget & { type: 'calendar.event' };
         data: ActivityDataByType['calendar.event_started'];
-    })
-    | (ActivityInputBase<'counter.milestone'> & {
-        actorUserId: string;
-        subjectUserId?: null;
-        target?: null;
-        data: ActivityDataByType['counter.milestone'];
     });
 
 export type ActivityFeedRecord = {
@@ -130,13 +122,6 @@ function isValidActivityData(type: ActivityType, data: unknown): data is Activit
         return Object.keys(data).length === 1
             && typeof data.title === 'string'
             && data.title.trim().length > 0;
-    }
-    if (type === 'counter.milestone') {
-        return Object.keys(data).length === 1
-            && typeof data.totalCount === 'number'
-            && Number.isSafeInteger(data.totalCount)
-            && data.totalCount > 0
-            && data.totalCount % 100 === 0;
     }
     if (type !== 'profile.updated') return false;
 
@@ -214,12 +199,6 @@ function hasValidActivityReferences(input: {
     if (input.type === 'calendar.event_started') {
         return input.target?.type === 'calendar.event';
     }
-    if (input.type === 'counter.milestone') {
-        return input.actorUserId != null
-            && (input.subjectUserId === undefined || input.subjectUserId === null)
-            && (input.target === undefined || input.target === null);
-    }
-
     if (input.type === 'crewnow.image_posted') return input.actorUserId != null && input.target?.type === 'crewnow.post';
     if (input.type === 'games.game_added') return input.actorUserId != null && input.target?.type === 'games.library_entry';
     if (input.type === 'profile.updated') {

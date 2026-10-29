@@ -51,10 +51,6 @@ export function createActivityFeedModule(
                 user.id,
                 { limit: query.limit, before },
                 async (viewerId, activity) => {
-                    if (activity.type === 'counter.milestone' && activity.actorUserId) {
-                        const actor = await userService.getUserAsUser(viewerId, activity.actorUserId);
-                        return actor.ok;
-                    }
                     const profileId = activity.targetType === 'platform.profile'
                         ? activity.targetId
                         : activity.type === 'profile.birthday'
@@ -70,16 +66,6 @@ export function createActivityFeedModule(
 
             const items: ReturnType<typeof toActivitySummary>[] = [];
             for (const activity of result.value.items) {
-                if (activity.type === 'counter.milestone') {
-                    const actorResult = activity.actorUserId
-                        ? await userService.getUserAsUser(user.id, activity.actorUserId)
-                        : null;
-                    if (!actorResult?.ok) continue;
-
-                    items.push(toActivitySummary(activity, toPublicUser(actorResult.value), null));
-                    continue;
-                }
-
                 const profileId = activity.targetType === 'platform.profile'
                     ? activity.targetId
                     : activity.type === 'profile.birthday'
