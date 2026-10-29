@@ -5,19 +5,19 @@ import { createAuthMiddleware, type SessionResolver } from './platform/auth';
 import { createUserModule } from './platform/users';
 import { createLogger } from './lib/logger';
 import { createRealtimeModule } from './platform/realtime';
-import { createCounterModule } from './apps/counter';
+import { createActivityFeedModule } from './platform/activity-feed/module';
 
 const logger = createLogger('app');
 
 type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser'>;
-type CounterServiceDependency = Pick<import('./apps/counter/service').CounterService, 'getCounts' | 'increment'>;
+type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 
 export type AppDependencies = {
     getSession: SessionResolver;
     authHandler: (request: Request) => Response | Promise<Response>;
     adminGroupName?: string;
     userService: UserServiceDependency;
-    counterService: CounterServiceDependency;
+    activityFeedService: ActivityFeedServiceDependency;
     realtimeModule: typeof createRealtimeModule;
     generateRealtimeToken: (user: import('better-auth').User, deviceId: string) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
 };
@@ -66,8 +66,7 @@ export function createApp(dependencies: AppDependencies) {
                         .get('/health', () => ({ status: 'ok' }))
                         .get('/status', () => ({ status: 'online' }))
                         .use(createUserModule(authMiddleware, dependencies.userService))
-                        .use(createCounterModule(authMiddleware, dependencies.counterService))
-                        .use(createCounterModule(authMiddleware, dependencies.counterService))
+                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )
         );

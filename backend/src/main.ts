@@ -19,7 +19,7 @@ const broadcast = createBroadcastPublisher(
     createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
 );
 const services = createServices(database.db, broadcast);
-const { users: userService, counter: counterService } = services;
+const { users: userService, activityFeed: activityFeedService } = services;
 const auth = createAuth(database.db, userService);
 
 const app = createApp({
@@ -27,7 +27,7 @@ const app = createApp({
     authHandler: (request) => auth.handler(request),
     adminGroupName: env.ADMIN_GROUP_NAME,
     userService,
-    counterService,
+    activityFeedService,
     realtimeModule: createRealtimeModule,
     generateRealtimeToken: generateCentrifugoToken,
 }).listen(3000);

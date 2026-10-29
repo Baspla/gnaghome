@@ -7,12 +7,12 @@ import type { PlatformEvent } from '$shared/dto/platform-event';
 const event: PlatformEvent = {
     id: 'event-1',
     occurredAt: '2026-01-01T00:00:00.000Z',
-    type: 'counter.changed',
-    data: { totalCount: 1 },
+    type: 'activity-feed.changed',
+    data: {},
 };
 
 describe('Centrifugo publisher', () => {
-    it('includes the shared counter channel in authenticated realtime tokens', async () => {
+    it('includes shared application realtime channels in authenticated tokens', async () => {
         const user = {
             id: 'user-1',
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -27,7 +27,7 @@ describe('Centrifugo publisher', () => {
         if (!result.ok) return;
 
         const payload = await jose.jwtVerify(result.value, new TextEncoder().encode(env.CENTRIFUGO_SECRET));
-        expect(payload.payload.channels).toContain('public:counter');
+        expect(payload.payload.channels).toContain('public:activity-feed');
         expect(payload.payload.channels).toContain('user:user-1');
     });
 
@@ -45,8 +45,8 @@ describe('Centrifugo publisher', () => {
         expect(url).toBe('http://centrifugo.test/api/broadcast');
         expect(new Headers(init.headers).get('X-API-Key')).toBe('test-api-key');
         expect(requestBody).toEqual({ channels: ['user:one', 'user:two'], data: event });
-        expect(requestBody.data.type).toBe('counter.changed');
-        expect(requestBody.data.data.totalCount).toBe(1);
+        expect(requestBody.data.type).toBe('activity-feed.changed');
+        expect(requestBody.data.data).toEqual({});
     });
 
     it('returns a domain error for a non-success response', async () => {

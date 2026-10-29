@@ -4,6 +4,7 @@ import { createApp, type AppDependencies } from './app';
 import { ok } from './lib/result';
 import { createAuthMiddleware } from './platform/auth';
 import { createRealtimeModule } from './platform/realtime';
+import type { ActivityFeedService } from './platform/activity-feed/service';
 
 const sessionUser = {
     id: 'user-1',
@@ -24,13 +25,7 @@ const getUserAsUser = mock(async (_currentUserId: string, targetUserId: string) 
     image: null,
     createdAt: profileCreatedAt,
 }));
-const counterResponse = {
-    userCount: 2,
-    totalCount: 7,
-    leaderboard: [{ id: 'user-1', rank: 1, name: 'Test User', image: null, count: 2 }],
-};
-const getCounterCounts = mock(async (_userId: string) => ok(counterResponse));
-const incrementCounter = mock(async (_userId: string) => ok({ ...counterResponse, userCount: 3, totalCount: 8 }));
+const getActivityFeed = mock<ActivityFeedService['getFeed']>(async () => ok({ items: [], nextCursor: null }));
 
 function makeTestApp() {
     return createApp({
@@ -38,7 +33,7 @@ function makeTestApp() {
         authHandler: async () => new Response('test auth handler'),
         adminGroupName: 'admins',
         userService: { getUserAsUser },
-        counterService: { getCounts: getCounterCounts, increment: incrementCounter },
+        activityFeedService: { getFeed: getActivityFeed },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });
@@ -48,8 +43,7 @@ describe('backend HTTP app', () => {
     beforeEach(() => {
         session = null;
         getUserAsUser.mockClear();
-        getCounterCounts.mockClear();
-        incrementCounter.mockClear();
+        getActivityFeed.mockClear();
     });
 
     it('builds an in-process app from injected test dependencies', () => {
@@ -90,30 +84,26 @@ describe('backend HTTP app', () => {
         expect(getUserAsUser).not.toHaveBeenCalled();
     });
 
-    it('requires authentication to read and increment the counter', async () => {
-        const app = makeTestApp();
-        const readResponse = await app.handle(new Request('http://localhost/api/v1/counter'));
-        const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
-
-        expect(readResponse.status).toBe(401);
-        expect(incrementResponse.status).toBe(401);
-        expect(getCounterCounts).not.toHaveBeenCalled();
-        expect(incrementCounter).not.toHaveBeenCalled();
-    });
-
-    it('returns the authenticated user’s counts and increments only that user', async () => {
+    it('filters protected feed targets before returning activity items', async () => {
         session = { user: sessionUser, session: { id: 'session-1' } };
-        const app = makeTestApp();
+        const response = await makeTestApp().handle(new Request('http://localhost/api/v1/activity-feed?limit=10'));
 
-        const readResponse = await app.handle(new Request('http://localhost/api/v1/counter'));
-        const incrementResponse = await app.handle(new Request('http://localhost/api/v1/counter/increment', { method: 'POST' }));
-
-        expect(readResponse.status).toBe(200);
-        expect(await readResponse.json()).toEqual(counterResponse);
-        expect(incrementResponse.status).toBe(200);
-        expect(await incrementResponse.json()).toEqual({ ...counterResponse, userCount: 3, totalCount: 8 });
-        expect(getCounterCounts).toHaveBeenCalledWith('user-1');
-        expect(incrementCounter).toHaveBeenCalledWith('user-1');
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ items: [], nextCursor: null });
+        expect(getActivityFeed).toHaveBeenCalledTimes(1);
+        const visibilityResolver = getActivityFeed.mock.calls[0]?.[2];
+        expect(visibilityResolver).toBeFunction();
+        expect(await visibilityResolver?.('user-1', {
+            id: 'item-1',
+            type: 'profile.updated',
+            actorUserId: 'user-1',
+            subjectUserId: 'user-1',
+            targetType: 'profile',
+            targetId: 'user-1',
+            data: { changedFields: ['name'] },
+            occurredAt: new Date(),
+            createdAt: new Date(),
+        } as never)).toBe(false);
     });
 
     it('passes the authenticated user to the user service', async () => {

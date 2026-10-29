@@ -16,7 +16,12 @@ export type CentrifugoPublisher = (payload: CentrifugoBroadcastPayload) => Promi
 export type BroadcastPublisher = (channels: string[], data: PlatformEvent) => Promise<Result<null, InternalError>>;
 
 export async function generateCentrifugoToken(user: User, deviceId: string): Promise<Result<string, InternalError>> {
-    const channels = [`user:${user.id}`, `device:${user.id}:${deviceId}`, RealtimeChannels.COUNTER, 'presence'];
+    const channels = [
+        `user:${user.id}`,
+        `device:${user.id}:${deviceId}`,
+        RealtimeChannels.ACTIVITY_FEED,
+        'presence',
+    ];
     return generateCentrifugoTokenForChannels(user, channels);
 }
 

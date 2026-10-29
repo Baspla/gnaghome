@@ -2,11 +2,11 @@ export const Modules = {
     USER: 'user',
     AUTH: 'auth',
     REALTIME: 'realtime',
-    COUNTER: 'counter',
+    ACTIVITY_FEED: 'activity-feed',
 } as const;
 
 export const RealtimeChannels = {
-    COUNTER: 'public:counter',
+    ACTIVITY_FEED: 'public:activity-feed',
 } as const;
 
 export type ModuleId = typeof Modules[keyof typeof Modules]; 
