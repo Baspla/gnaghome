@@ -15,5 +15,5 @@
         <a href="/crewnow" class="text-sm text-primary-700-300 hover:underline">← Zurück zu CrewNow</a>
         <h1 class="mt-3 text-2xl font-bold text-surface-950-50">Neuer Post</h1>
     </header>
-    <PostEditor mode="create" onSaved={(postId) => void goto(`/crewnow/posts/${encodeURIComponent(postId)}`)} />
+    <PostEditor mode="create" onSaved={() => void goto('/crewnow')} />
 </main>

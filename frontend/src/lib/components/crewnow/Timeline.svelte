@@ -122,7 +122,7 @@
     <div bind:this={sentinel} class="flex min-h-12 justify-center py-3" aria-live="polite">
         {#if loadingMore}<span class="text-sm text-surface-600-400">Weitere CrewNows werden geladen …</span>
         {:else if nextCursor}<button type="button" class="text-sm text-primary-700-300 underline" onclick={() => void loadPage(true)}>Weitere CrewNows laden</button>
-        {:else if posts.length > 0}<span class="text-sm text-surface-600-400">Du bist auf dem neuesten Stand.</span>{/if}
+        {:else if posts.length > 0}<span class="text-sm text-surface-600-400">Du hast das Ende erreicht.</span>{/if}
     </div>
 </section>
 

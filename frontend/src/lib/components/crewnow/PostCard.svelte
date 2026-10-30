@@ -1,6 +1,7 @@
 <script lang="ts">
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
+    import { MessageSquareShare, SquarePen, Trash } from '@lucide/svelte';
     import PostImage from './PostImage.svelte';
     import { formatPostDate } from './post-date';
 
@@ -34,11 +35,11 @@
             {/if}
         </div>
         {#if !hideOpenButton}
-            <a href={`/crewnow/posts/${encodeURIComponent(post.id)}`} class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800">Öffnen</a>
+            <a href={`/crewnow/posts/${encodeURIComponent(post.id)}`} class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800"><MessageSquareShare class="h-4 w-4" /></a>
         {/if}
         {#if post.canEdit}
-            <a class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800" href={`/crewnow/posts/${encodeURIComponent(post.id)}/edit`}>Bearbeiten</a>
-            <button type="button" class="rounded-lg px-3 py-2 text-sm text-error-700-300 hover:bg-error-100-900" onclick={() => onDelete?.(post)}>Löschen</button>
+            <a class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800" href={`/crewnow/posts/${encodeURIComponent(post.id)}/edit`}><SquarePen class="h-4 w-4" /></a>
+            <button type="button" class="rounded-lg px-3 py-2 text-sm text-error-700-300 hover:bg-error-100-900" onclick={() => onDelete?.(post)}><Trash class="h-4 w-4" /></button>
         {/if}
     </div>
 
@@ -49,7 +50,7 @@
     {/if}
 
     {#if post.taggedUsers.length > 0}
-        <div class="px-4 pb-4 pt-3 sm:px-5">
+        <div class="px-4 pb-4 sm:px-5">
             <p class="text-xs font-medium uppercase tracking-wide text-surface-600-400">Auf dem Bild</p>
             <ul class="mt-2 flex flex-wrap gap-2">
                 {#each post.taggedUsers as person (person.id)}

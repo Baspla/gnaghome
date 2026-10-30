@@ -47,7 +47,7 @@
     }
 </script>
 
-<figure class={['w-full', className]}>
+<figure class={['w-full pb-4', className]}>
     <div class="relative overflow-hidden rounded-xl bg-surface-200-800">
         <img
             src={mainImage}
@@ -73,6 +73,6 @@
         {/if}
     </div>
     {#if caption}
-        <figcaption class="mt-3 px-4 pb-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200">{caption}</figcaption>
+        <figcaption class="mt-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200">{caption}</figcaption>
     {/if}
 </figure>
