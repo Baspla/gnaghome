@@ -97,7 +97,7 @@
     });
 </script>
 
-<section class="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+<section class="flex w-full flex-col gap-5">
     {#if loading}
         <p class="py-12 text-center text-surface-600-400" role="status">CrewNows werden geladen …</p>
     {:else if posts.length === 0 && !errorMessage}

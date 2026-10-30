@@ -1,8 +1,9 @@
 <script lang="ts">
-    import { setPageTitle } from '$lib/utils';
-    import Timeline from '$lib/components/crewnow/Timeline.svelte';
+    import { setPageTitle } from "$lib/utils";
+    import PageHeading from "$lib/components/PageHeading.svelte";
+    import Timeline from "$lib/components/crewnow/Timeline.svelte";
 
-    setPageTitle('CrewNow');
+    setPageTitle("CrewNow");
 </script>
 
 <svelte:head>
@@ -10,12 +11,9 @@
     <meta name="description" content="Bilder und Momente eurer Gruppe." />
 </svelte:head>
 
-<main class="min-h-full">
-    <header class="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 pb-2 pt-7 sm:px-6">
-        <div>
-            <h1 class="text-2xl font-bold text-surface-950-50">CrewNow</h1>
-            <p class="mt-1 text-sm text-surface-600-400">Momente aus eurer Gruppe</p>
-        </div>
+<main class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <header class="flex items-center justify-between gap-4">
+        <PageHeading title="CrewNow" />
         <a href="/crewnow/create" class="btn preset-filled shrink-0">Neuer Post</a>
     </header>
     <Timeline />

@@ -3,6 +3,7 @@
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import Button from '$lib/components/Button.svelte';
+    import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
     import { setPageTitle } from '$lib/utils';
@@ -89,7 +90,7 @@
 
 <main class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6">
     <header>
-        <h1 class="text-3xl font-bold text-surface-950-50">Aktivitäten</h1>
+        <PageHeading title="Aktivitäten" />
     </header>
 
     <section class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900" aria-label="Aktivitätsliste">
