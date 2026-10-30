@@ -1,4 +1,4 @@
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { user } from '../users/schema';
 
@@ -27,4 +27,7 @@ export const activityFeedItem = sqliteTable('activity_feed_item', {
     index('activity_feed_item_actor_idx').on(table.actorUserId),
     index('activity_feed_item_subject_idx').on(table.subjectUserId),
     index('activity_feed_item_target_idx').on(table.targetType, table.targetId),
+    uniqueIndex('activity_feed_item_crewnow_post_uidx')
+        .on(table.targetType, table.targetId)
+        .where(sql`${table.type} = 'crewnow.image_posted'`),
 ]);

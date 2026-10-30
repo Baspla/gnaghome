@@ -21,7 +21,7 @@
             <Activity class="h-5 w-5" />
         </IconSidebarElement>
 
-        <IconSidebarElement href="/crewnow" label="CrewNow" disabled>
+        <IconSidebarElement href="/crewnow" label="CrewNow">
             <Camera class="h-5 w-5" />
         </IconSidebarElement>
 

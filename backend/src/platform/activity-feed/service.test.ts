@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { eq } from 'drizzle-orm';
 import { createDatabase } from '../../db/connection';
 import { ok } from '../../lib/result';
 import { user } from '../users/schema';
@@ -65,6 +66,24 @@ describe('ActivityFeedService', () => {
             data: {},
         });
         expect(JSON.stringify(broadcast.mock.calls[0]?.[1])).not.toContain('user-1');
+    });
+
+    it('records no more than one CrewNow activity for the same post, including concurrent retries', async () => {
+        const input = {
+            type: 'crewnow.image_posted' as const,
+            actorUserId: 'user-1',
+            target: { type: 'crewnow.post' as const, id: 'post-idempotent' },
+            data: { imageFileId: 'file-1' },
+        };
+        const [first, second] = await Promise.all([
+            service.recordActivity(input),
+            service.recordActivity(input),
+        ]);
+        expect(first.ok).toBe(true);
+        expect(second.ok).toBe(true);
+        const records = await database.db.select().from(activityFeedItem)
+            .where(eq(activityFeedItem.targetId, 'post-idempotent'));
+        expect(records).toHaveLength(1);
     });
 
     it('records actorless system activity and permits a subject without a target', async () => {

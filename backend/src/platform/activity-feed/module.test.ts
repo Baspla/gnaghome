@@ -8,12 +8,15 @@ import { createAuthMiddleware } from '../auth';
 import type { UserService } from '../users/service';
 import { ActivityFeedService } from './service';
 import { createActivityFeedModule } from './module';
+import type { CrewNowService } from '../../apps/crewnow/service';
 
 describe('activity feed HTTP module', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
     let service: ActivityFeedService;
     let session: { user: { id: string; createdAt: Date; updatedAt: Date; name: string; email: string; emailVerified: boolean; groups: string; image: string | null }; session: { id: string } } | null;
     let canViewUser: (viewerId: string, targetUserId: string) => boolean;
+    let currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
+    let postExists = true;
 
     const getUserAsUser: UserService['getUserAsUser'] = async (viewerId, targetUserId) => {
         if (!canViewUser(viewerId, targetUserId)) {
@@ -29,7 +32,14 @@ describe('activity feed HTTP module', () => {
             async () => session,
             async () => new Response('auth handler'),
         );
-        return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }));
+        const crewNowService: Pick<CrewNowService, 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'> = {
+            getPostForActivity: async (_viewerId, postId) => postId === 'post-1' && postExists
+                ? ok({ id: postId, taggedUsers: currentPostTags } as never)
+                : err({ status: 404, code: 'NOT_FOUND', message: 'Post not found' }),
+            getActivityTaggedUsers: async (_viewerId, ids) => currentPostTags.filter((person) => ids.includes(person.id)),
+            getTagIdsForPost: async () => currentPostTags.map((person) => person.id),
+        };
+        return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }, crewNowService));
     }
 
     beforeEach(async () => {
@@ -55,6 +65,8 @@ describe('activity feed HTTP module', () => {
             session: { id: 'session-1' },
         };
         canViewUser = (_viewerId, targetUserId) => targetUserId !== 'private-1';
+        currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
+        postExists = true;
     });
 
     afterEach(() => database.close());
@@ -66,7 +78,7 @@ describe('activity feed HTTP module', () => {
         expect(response.status).toBe(401);
     });
 
-    it('returns authorized profile activities with public actor data only', async () => {
+    it('returns authorized profile and CrewNow activities with public actor and live tagged users', async () => {
         await service.recordActivity({
             type: 'profile.updated',
             actorUserId: 'actor-1',
@@ -97,6 +109,10 @@ describe('activity feed HTTP module', () => {
         expect(response.status).toBe(200);
         expect(body).toMatchObject({
             items: [{
+                type: 'crewnow.image_posted',
+                actor: { id: 'actor-1', name: 'Alice', image: 'https://example.test/alice.png' },
+                data: { imageFileId: 'file-1', taggedUsers: [{ id: 'tag-1', name: 'Tag One', image: null }] },
+            }, {
                 type: 'profile.updated',
                 actor: { id: 'actor-1', name: 'Alice', image: 'https://example.test/alice.png' },
                 subject: { id: 'subject-1', name: 'Bob', image: null },
@@ -106,8 +122,30 @@ describe('activity feed HTTP module', () => {
             nextCursor: null,
         });
         expect(JSON.stringify(body)).not.toContain('private-1');
-        expect(JSON.stringify(body)).not.toContain('crewnow.post');
+        expect(JSON.stringify(body)).toContain('crewnow.post');
         expect(JSON.stringify(body)).not.toContain('alice@example.test');
+    });
+
+    it('resolves current post tags on every activity feed read and omits deleted posts', async () => {
+        await service.recordActivity({
+            type: 'crewnow.image_posted',
+            actorUserId: 'actor-1',
+            target: { type: 'crewnow.post', id: 'post-1' },
+            data: { imageFileId: 'file-1' },
+        });
+
+        const firstResponse = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        const first = await firstResponse.json() as { items: Array<{ data: { taggedUsers?: Array<{ id: string }> } }> };
+        expect(first.items[0]?.data.taggedUsers?.map((tag) => tag.id)).toEqual(['tag-1']);
+
+        currentPostTags = [{ id: 'tag-2', name: 'Tag Two', image: null }, { id: 'tag-3', name: 'Tag Three', image: null }];
+        const editedResponse = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        const edited = await editedResponse.json() as { items: Array<{ data: { taggedUsers?: Array<{ id: string }> } }> };
+        expect(edited.items[0]?.data.taggedUsers?.map((tag) => tag.id)).toEqual(['tag-2', 'tag-3']);
+
+        postExists = false;
+        const deletedResponse = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        expect(await deletedResponse.json()).toMatchObject({ items: [], nextCursor: null });
     });
 
     it('paginates authorized activity in the URL cursor format', async () => {

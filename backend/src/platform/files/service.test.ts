@@ -86,6 +86,16 @@ describe('FilesService', () => {
         expect(expired).toMatchObject({ ok: false, error: { status: 404 } });
     });
 
+    it('discards only an unexpired pending upload owned by the caller', async () => {
+        const upload = await service.uploadFile('user-1', PNG_BYTES);
+        expect(upload.ok).toBe(true);
+        if (!upload.ok) return;
+
+        expect(await service.discardPendingUpload(upload.value.id, 'user-2')).toMatchObject({ ok: false, error: { status: 403 } });
+        expect(await service.discardPendingUpload(upload.value.id, 'user-1')).toEqual({ ok: true, value: null });
+        expect(await service.getFile(upload.value.id, 'user-1')).toMatchObject({ ok: false, error: { status: 404 } });
+    });
+
     it('cleans expired pending uploads while retaining unexpired and finalized files', async () => {
         const abandoned = await service.uploadFile('user-1', PNG_BYTES);
         const pending = await service.uploadFile('user-1', PNG_BYTES);

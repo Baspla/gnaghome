@@ -38,6 +38,19 @@ function makeTestApp() {
             uploadFile: async () => ok({} as never),
             getFile: async () => ok({} as never),
         },
+        crewNowService: {
+            createId: () => 'test-post-id',
+            createPost: async () => ok({} as never),
+            updatePost: async () => ok({} as never),
+            deletePost: async () => ok(null),
+            discardPendingUpload: async () => ok(null),
+            getPost: async () => ok({} as never),
+            getTimeline: async () => ok({ items: [], nextCursor: null }),
+            searchUsers: async () => ok([]),
+            getPostForActivity: async () => ok({} as never),
+            getActivityTaggedUsers: async (_viewerUserId: string, ids: string[]) => ids.map((id) => ({ id, name: id, image: null })),
+            getTagIdsForPost: async () => [],
+        },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });
@@ -86,6 +99,17 @@ describe('backend HTTP app', () => {
         const response = await makeTestApp().handle(new Request('http://localhost/api/v1/users/me'));
         expect(response.status).toBe(401);
         expect(getUserAsUser).not.toHaveBeenCalled();
+    });
+
+    it('serves the authenticated CrewNow timeline and user-search endpoints', async () => {
+        session = { user: sessionUser, session: { id: 'session-1' } };
+        const timelineResponse = await makeTestApp().handle(new Request('http://localhost/api/v1/crewnow/timeline'));
+        const usersResponse = await makeTestApp().handle(new Request('http://localhost/api/v1/crewnow/users?q=Alice'));
+
+        expect(timelineResponse.status).toBe(200);
+        expect(await timelineResponse.json()).toEqual({ items: [], nextCursor: null });
+        expect(usersResponse.status).toBe(200);
+        expect(await usersResponse.json()).toEqual({ items: [] });
     });
 
     it('filters protected feed targets before returning activity items', async () => {

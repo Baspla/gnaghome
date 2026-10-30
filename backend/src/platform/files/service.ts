@@ -118,6 +118,72 @@ export class FilesService {
         }
     }
 
+    /** Validate a pending image upload against the owning app's authenticated user. */
+    async getOwnedPendingUpload(
+        fileId: string,
+        uploaderUserId: string,
+    ): Promise<Result<FileSummary, BadRequestError | NotFoundError | ForbiddenError | InternalError>> {
+        return this.getOwnedUpload(fileId, uploaderUserId, true);
+    }
+
+    /** Discard a caller-owned pending upload, never a file attached to a durable resource. */
+    async discardPendingUpload(
+        fileId: string,
+        uploaderUserId: string,
+    ): Promise<Result<null, BadRequestError | NotFoundError | ForbiddenError | InternalError>> {
+        try {
+            const [file] = await this.db.select().from(storedFile).where(eq(storedFile.id, fileId)).limit(1);
+            if (!file || file.status !== 'pending' || !file.expiresAt || file.expiresAt.getTime() <= Date.now()) {
+                return err({ status: 404, code: 'NOT_FOUND', message: 'Pending upload not found' });
+            }
+            if (file.uploadedByUserId !== uploaderUserId) {
+                return err({ status: 403, code: 'FORBIDDEN', message: 'Only the uploader can discard this file' });
+            }
+            const [claimed] = await this.db.update(storedFile)
+                .set({ status: 'deleting', isPrivate: true })
+                .where(and(
+                    eq(storedFile.id, fileId),
+                    eq(storedFile.uploadedByUserId, uploaderUserId),
+                    eq(storedFile.status, 'pending'),
+                    gt(storedFile.expiresAt, new Date()),
+                ))
+                .returning({ id: storedFile.id });
+            if (!claimed) return err({ status: 404, code: 'NOT_FOUND', message: 'Pending upload not found' });
+            await this.storage.delete(file.storageKey);
+            await this.db.delete(storedFile).where(and(eq(storedFile.id, fileId), eq(storedFile.status, 'deleting')));
+            return ok(null);
+        } catch (error) {
+            logger.error('failed to discard pending image upload', { fileId, uploaderUserId, error: String(error) });
+            return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to discard pending upload' });
+        }
+    }
+
+    private async getOwnedUpload(
+        fileId: string,
+        uploaderUserId: string,
+        requirePending: boolean,
+    ): Promise<Result<FileSummary, BadRequestError | NotFoundError | ForbiddenError | InternalError>> {
+        try {
+            const [file] = await this.db.select().from(storedFile).where(eq(storedFile.id, fileId)).limit(1);
+            if (!file || file.status === 'deleting' || (file.status === 'pending' && (!file.expiresAt || file.expiresAt.getTime() <= Date.now()))) {
+                return err({ status: 404, code: 'NOT_FOUND', message: 'File upload not found' });
+            }
+            if (file.uploadedByUserId !== uploaderUserId) {
+                return err({ status: 403, code: 'FORBIDDEN', message: 'Only the uploader can attach this file' });
+            }
+            if (requirePending && file.status !== 'pending') {
+                return err({ status: 400, code: 'BAD_REQUEST', message: 'File is already attached to a resource' });
+            }
+            if (!requirePending && file.status !== 'ready') {
+                return err({ status: 404, code: 'NOT_FOUND', message: 'Attached file not found' });
+            }
+            return ok(toSummary(file));
+        } catch (error) {
+            logger.error('failed to validate pending image upload', { fileId, uploaderUserId, error: String(error) });
+            return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to validate image upload' });
+        }
+    }
+
     async finalizeUpload(
         fileId: string,
         uploaderUserId: string,

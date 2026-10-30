@@ -41,6 +41,8 @@ describe('SQLite integration', () => {
             const activityForeignKeys = await db.all('PRAGMA foreign_key_list(activity_feed_item)') as { table: string; from: string; on_delete: string }[];
             expect(activityForeignKeys).toHaveLength(2);
             expect(activityForeignKeys.every((foreignKey) => foreignKey.table === 'user' && foreignKey.on_delete.toLowerCase() === 'set null')).toBe(true);
+            db.run(`INSERT INTO activity_feed_item (id, type, target_type, target_id, data, occurred_at, created_at) VALUES ('crewnow-activity-1', 'crewnow.image_posted', 'crewnow.post', 'post-unique-target', '{}', 0, 0)`);
+            expect(() => db.run(`INSERT INTO activity_feed_item (id, type, target_type, target_id, data, occurred_at, created_at) VALUES ('crewnow-activity-2', 'crewnow.image_posted', 'crewnow.post', 'post-unique-target', '{}', 0, 0)`)).toThrow();
             expect(() => db.run(`INSERT INTO activity_feed_item (id, type, data, occurred_at, target_type) VALUES ('invalid-target', 'crewnow.image_posted', '{}', 0, 'crewnow.post')`)).toThrow();
         } finally {
             connection.close();

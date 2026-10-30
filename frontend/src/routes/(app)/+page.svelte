@@ -9,11 +9,11 @@
 
     type Activity = {
         id: string;
-        type: 'profile.updated' | 'profile.birthday';
+        type: 'crewnow.image_posted' | 'profile.updated' | 'profile.birthday';
         actor: { id: string; name: string; image: string | null } | null;
         subject: { id: string; name: string; image: string | null } | null;
         target: { type: string; id: string } | null;
-        data: { changedFields?: Array<'name' | 'image'> };
+        data: { changedFields?: Array<'name' | 'image'>; imageFileId?: string; taggedUsers?: Array<{ id: string; name: string; image: string | null }> };
         occurredAt: string;
     };
 
@@ -36,6 +36,7 @@
 
     function activityDescription(activity: Activity): string {
         if (activity.type === 'profile.birthday') return 'hat heute Geburtstag.';
+        if (activity.type === 'crewnow.image_posted') return 'hat ein CrewNow gepostet.';
         if (activity.actor?.id === activity.subject?.id) return 'hat das eigene Profil aktualisiert.';
         return 'hat das Profil aktualisiert.';
     }
@@ -140,6 +141,25 @@
                                         class="font-semibold text-surface-950-50"
                                     />
                                     <span> aktualisiert.</span>
+                                {:else if activity.type === 'crewnow.image_posted'}
+                                    <span> hat ein </span>
+                                    {#if activity.target?.type === 'crewnow.post'}
+                                        <a class="font-semibold text-primary-700-300 hover:underline" href={`/crewnow/posts/${encodeURIComponent(activity.target.id)}`}>CrewNow</a>
+                                    {:else}
+                                        <span class="font-semibold">CrewNow</span>
+                                    {/if}
+                                    {#if activity.data.taggedUsers?.length}
+                                        <span> mit </span>
+                                        {#if activity.data.taggedUsers.length <= 3}
+                                            {#each activity.data.taggedUsers as person, index (person.id)}
+                                                {#if index > 0}{#if index === activity.data.taggedUsers.length - 1}<span> und </span>{:else}<span>, </span>{/if}{/if}
+                                                <Username userId={person.id} name={person.name} class="font-semibold text-surface-950-50" />
+                                            {/each}
+                                        {:else}
+                                            <span>{activity.data.taggedUsers.length} Freunden</span>
+                                        {/if}
+                                    {/if}
+                                    <span> gepostet.</span>
                                 {:else}
                                     <span>{activityDescription(activity)}</span>
                                 {/if}

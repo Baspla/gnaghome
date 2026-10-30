@@ -217,6 +217,27 @@ export class ActivityFeedService {
         private readonly broadcast: BroadcastPublisher,
     ) {}
 
+    /** Ask connected clients to reload the durable feed without recording another activity. */
+    async invalidateFeed(): Promise<void> {
+        await this.publishChangedEvent();
+    }
+
+    /** Publish the shared feed invalidation; callers should invoke after committing durable state. */
+    async publishChangedEvent(): Promise<void> {
+        const event: ActivityFeedChangedEvent = {
+            id: crypto.randomUUID(),
+            occurredAt: new Date().toISOString(),
+            type: 'activity-feed.changed',
+            data: {},
+        };
+        try {
+            const result = await this.broadcast([RealtimeChannels.ACTIVITY_FEED], event);
+            if (!result.ok) logger.warn('activity feed invalidation failed', { message: result.error.message });
+        } catch (error) {
+            logger.warn('activity feed invalidation failed', { error: String(error) });
+        }
+    }
+
     async recordActivity(input: RecordActivityInput): Promise<Result<ActivityFeedRecord, BadRequestError | InternalError>> {
         if (!isPlainObject(input)
             || !isActivityType(input.type)
@@ -236,6 +257,15 @@ export class ActivityFeedService {
 
         const occurredAt = input.occurredAt ?? new Date();
         try {
+            if (input.type === 'crewnow.image_posted' && input.target?.type === 'crewnow.post') {
+                const [existing] = await this.db.select().from(activityFeedItem)
+                    .where(and(
+                        eq(activityFeedItem.type, 'crewnow.image_posted'),
+                        eq(activityFeedItem.targetType, 'crewnow.post'),
+                        eq(activityFeedItem.targetId, input.target.id),
+                    )).limit(1);
+                if (existing) return ok(toRecord(existing));
+            }
             const row = this.db.insert(activityFeedItem).values({
                 id: crypto.randomUUID(),
                 type: input.type,
@@ -251,28 +281,22 @@ export class ActivityFeedService {
                 return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to record activity' });
             }
             const activity = toRecord(row);
-            const event: ActivityFeedChangedEvent = {
-                id: crypto.randomUUID(),
-                occurredAt: new Date().toISOString(),
-                type: 'activity-feed.changed',
-                data: {},
-            };
-            try {
-                const broadcastResult = await this.broadcast([RealtimeChannels.ACTIVITY_FEED], event);
-                if (!broadcastResult.ok) {
-                    logger.warn('activity recorded but feed invalidation failed', {
-                        type: activity.type,
-                        message: broadcastResult.error.message,
-                    });
-                }
-            } catch (error) {
-                logger.warn('activity recorded but feed invalidation failed', {
-                    type: activity.type,
-                    error: String(error),
-                });
-            }
+            await this.invalidateFeed();
             return ok(activity);
         } catch (error) {
+            if (input.type === 'crewnow.image_posted' && input.target?.type === 'crewnow.post') {
+                try {
+                    const [existing] = await this.db.select().from(activityFeedItem)
+                        .where(and(
+                            eq(activityFeedItem.type, 'crewnow.image_posted'),
+                            eq(activityFeedItem.targetType, 'crewnow.post'),
+                            eq(activityFeedItem.targetId, input.target.id),
+                        )).limit(1);
+                    if (existing) return ok(toRecord(existing));
+                } catch {
+                    // Fall through to the standard recording error.
+                }
+            }
             logger.error('failed to record activity', { type: input.type, error: String(error) });
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to record activity' });
         }

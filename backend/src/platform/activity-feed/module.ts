@@ -3,9 +3,11 @@ import { Modules } from '$shared/constants';
 import type { UserService } from '../users/service';
 import type { createAuthMiddleware } from '../auth';
 import type { ActivityFeedService, ActivityFeedRecord } from './service';
+import type { CrewNowService } from '../../apps/crewnow/service';
 
 type ActivityFeedUserService = Pick<UserService, 'getUserAsUser'>;
 type ActivityFeedServiceDependency = Pick<ActivityFeedService, 'getFeed'>;
+type ActivityFeedCrewNowService = Pick<CrewNowService, 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 
 function toPublicUser(user: { id: string; name: string; image: string | null } | null) {
     return user ? { id: user.id, name: user.name, image: user.image } : null;
@@ -29,6 +31,7 @@ export function createActivityFeedModule(
     authMiddleware: ReturnType<typeof createAuthMiddleware>,
     activityFeedService: ActivityFeedServiceDependency,
     userService: ActivityFeedUserService,
+    crewNowService?: ActivityFeedCrewNowService,
 ) {
     return new Elysia({ prefix: '/activity-feed', name: Modules.ACTIVITY_FEED })
         .use(authMiddleware)
@@ -56,7 +59,11 @@ export function createActivityFeedModule(
                         : activity.type === 'profile.birthday'
                             ? activity.subjectUserId
                             : null;
-                    if (!profileId) return false;
+                    if (!profileId) {
+                        if (activity.targetType !== 'crewnow.post' || !activity.targetId || !crewNowService) return false;
+                        const post = await crewNowService.getPostForActivity(viewerId, activity.targetId);
+                        return post.ok;
+                    }
 
                     const profile = await userService.getUserAsUser(viewerId, profileId);
                     return profile.ok;
@@ -71,7 +78,28 @@ export function createActivityFeedModule(
                     : activity.type === 'profile.birthday'
                         ? activity.subjectUserId
                         : null;
-                if (!profileId) continue;
+                if (!profileId) {
+                    if (activity.targetType !== 'crewnow.post' || !activity.targetId || !crewNowService) continue;
+                    const postResult = await crewNowService.getPostForActivity(user.id, activity.targetId);
+                    if (!postResult.ok) continue;
+                    const actorResult = activity.actorUserId
+                        ? await userService.getUserAsUser(user.id, activity.actorUserId)
+                        : null;
+                    items.push({
+                        ...toActivitySummary(
+                            activity,
+                            actorResult?.ok ? toPublicUser(actorResult.value) : null,
+                            null,
+                        ),
+                        data: Object.assign({}, activity.data, {
+                            taggedUsers: await crewNowService.getActivityTaggedUsers(
+                                user.id,
+                                await crewNowService.getTagIdsForPost(activity.targetId),
+                            ),
+                        }),
+                    });
+                    continue;
+                }
 
                 const targetResult = await userService.getUserAsUser(user.id, profileId);
                 if (!targetResult.ok) continue;
