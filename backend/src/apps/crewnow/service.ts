@@ -15,11 +15,14 @@ import type { ActivityFeedService } from '../../platform/activity-feed/service';
 import type { FilesService } from '../../platform/files/service';
 import { user } from '../../platform/users/schema';
 import { crewNowPost, crewNowPostTag, type CrewNowPost } from './schema';
+import type { DiscussionsService } from '../../platform/discussions/service';
 
 export type CrewNowUserSummary = { id: string; name: string; image: string | null };
 
 export type CrewNowPostSummary = {
     id: string;
+    discussionId: string | null;
+    commentCount: number;
     author: CrewNowUserSummary;
     backImage: { id: string; url: string };
     frontImage: { id: string; url: string };
@@ -65,6 +68,7 @@ export class CrewNowService {
         private readonly db: AppDatabase,
         private readonly files: Pick<FilesService, 'getFile' | 'getOwnedPendingUpload' | 'finalizeUpload' | 'deleteFile' | 'discardPendingUpload'>,
         private readonly activityFeed: Pick<ActivityFeedService, 'recordActivity' | 'invalidateFeed'>,
+        private readonly discussions: Pick<DiscussionsService, 'getOrCreateDiscussion' | 'deleteDiscussion' | 'getMessageCounts'>,
     ) {}
 
     private async getTaggedUsers(postId: string): Promise<CrewNowUserSummary[]> {
@@ -80,14 +84,19 @@ export class CrewNowService {
         return rows;
     }
 
-    private async resolvePost(post: CrewNowPost, viewerUserId: string): Promise<CrewNowPostSummary | null> {
+    private async resolvePost(post: CrewNowPost, viewerUserId: string, commentCount?: number): Promise<CrewNowPostSummary | null> {
         const [author] = await this.db.select({ id: user.id, name: user.name, image: user.image })
             .from(user)
             .where(eq(user.id, post.authorUserId))
             .limit(1);
         if (!author) return null;
+        const commentCounts = commentCount !== undefined ? null : post.discussionId
+            ? await this.discussions.getMessageCounts([post.discussionId])
+            : {};
         return {
             id: post.id,
+            discussionId: post.discussionId,
+            commentCount: commentCount ?? (post.discussionId && commentCounts ? commentCounts[post.discussionId] ?? 0 : 0),
             author,
             backImage: { id: post.backImageFileId, url: `/api/v1/files/${post.backImageFileId}` },
             frontImage: { id: post.frontImageFileId, url: `/api/v1/files/${post.frontImageFileId}` },
@@ -153,10 +162,18 @@ export class CrewNowService {
                 }
                 const summary = await this.resolvePost(existing, authorUserId);
                 if (!summary) return err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
+                let discussionId = existing.discussionId;
+                if (!discussionId) {
+                    const discussionResult = await this.discussions.getOrCreateDiscussion('crewnow.post', existing.id);
+                    if (!discussionResult.ok) return err(discussionResult.error);
+                    discussionId = discussionResult.value.id;
+                    await this.db.update(crewNowPost).set({ discussionId }).where(eq(crewNowPost.id, existing.id));
+                }
                 const activity = await this.activityFeed.recordActivity({
                     type: 'crewnow.image_posted',
                     actorUserId: authorUserId,
                     target: { type: 'crewnow.post', id: existing.id },
+                    discussionId,
                     data: { imageFileId: existing.backImageFileId },
                     occurredAt: existing.createdAt,
                 });
@@ -184,11 +201,15 @@ export class CrewNowService {
                 if (!file.ok) return err(file.error);
             }
 
+            const discussionResult = await this.discussions.getOrCreateDiscussion('crewnow.post', input.id);
+            if (!discussionResult.ok) return err(discussionResult.error);
+
             const post: CrewNowPost = {
                 id: input.id,
                 authorUserId,
                 backImageFileId: input.backImageFileId,
                 frontImageFileId: input.frontImageFileId,
+                discussionId: discussionResult.value.id,
                 caption: input.caption,
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -211,6 +232,7 @@ export class CrewNowService {
                 : finalizedBack;
             if (!finalizedBack.ok || !finalizedFront.ok) {
                 await this.db.delete(crewNowPost).where(eq(crewNowPost.id, post.id));
+                await this.discussions.deleteDiscussion(discussionResult.value.id);
                 await Promise.all([input.backImageFileId, input.frontImageFileId].map((fileId) => this.files.deleteFile(fileId)));
                 if (!finalizedBack.ok) return err(finalizedBack.error);
                 if (!finalizedFront.ok) return err(finalizedFront.error);
@@ -220,6 +242,7 @@ export class CrewNowService {
                 type: 'crewnow.image_posted',
                 actorUserId: authorUserId,
                 target: { type: 'crewnow.post', id: post.id },
+                discussionId: discussionResult.value.id,
                 data: { imageFileId: post.backImageFileId },
                 occurredAt: post.createdAt,
             });
@@ -280,6 +303,9 @@ export class CrewNowService {
             await this.db.transaction(async (tx) => {
                 await tx.delete(crewNowPost).where(eq(crewNowPost.id, postId));
             });
+            if (post.discussionId) {
+                await this.discussions.deleteDiscussion(post.discussionId);
+            }
             await Promise.all([post.backImageFileId, post.frontImageFileId].map((fileId) => this.files.deleteFile(fileId)));
             await this.activityFeed.invalidateFeed();
             return ok(null);
@@ -337,8 +363,13 @@ export class CrewNowService {
                 .limit(limit + 1);
             const hasMore = rows.length > limit;
             const pageRows = rows.slice(0, limit);
-            const items = (await Promise.all(pageRows.map((post) => this.resolvePost(post, viewerUserId))))
-                .filter((post): post is CrewNowPostSummary => post !== null);
+            const discussionIds = pageRows.flatMap((post) => post.discussionId ? [post.discussionId] : []);
+            const commentCounts = await this.discussions.getMessageCounts(discussionIds);
+            const items = (await Promise.all(pageRows.map((post) => this.resolvePost(
+                post,
+                viewerUserId,
+                post.discussionId ? commentCounts[post.discussionId] ?? 0 : 0,
+            )))).filter((post): post is CrewNowPostSummary => post !== null);
             const last = pageRows[pageRows.length - 1];
             return ok({
                 items,

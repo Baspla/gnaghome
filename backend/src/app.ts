@@ -8,6 +8,7 @@ import { createRealtimeModule } from './platform/realtime';
 import { createActivityFeedModule } from './platform/activity-feed/module';
 import { createFilesModule } from './platform/files/module';
 import { createCrewNowModule } from './apps/crewnow/module';
+import { createDiscussionsModule } from './platform/discussions/module';
 
 const logger = createLogger('app');
 
@@ -15,6 +16,9 @@ type UserServiceDependency = Pick<import('./platform/users/service').UserService
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
+type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
+type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
+type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
 
 export type AppDependencies = {
     getSession: SessionResolver;
@@ -24,6 +28,9 @@ export type AppDependencies = {
     activityFeedService: ActivityFeedServiceDependency;
     filesService: FilesServiceDependency;
     crewNowService: CrewNowServiceDependency;
+    discussionsService: DiscussionsServiceDependency;
+    discussionsFeedService: DiscussionsFeedDependency;
+    canViewDiscussionTarget: DiscussionTargetAuthorizer;
     realtimeModule: typeof createRealtimeModule;
     generateRealtimeToken: (user: import('better-auth').User, deviceId: string) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
 };
@@ -72,7 +79,8 @@ export function createApp(dependencies: AppDependencies) {
                         .get('/health', () => ({ status: 'ok' }))
                         .get('/status', () => ({ status: 'online' }))
                         .use(createUserModule(authMiddleware, dependencies.userService))
-                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService))
+                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService))
+                        .use(createDiscussionsModule(authMiddleware, dependencies.discussionsService, dependencies.canViewDiscussionTarget))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCrewNowModule(authMiddleware, dependencies.crewNowService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))

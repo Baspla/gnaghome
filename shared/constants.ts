@@ -3,11 +3,13 @@ export const Modules = {
     AUTH: 'auth',
     REALTIME: 'realtime',
     ACTIVITY_FEED: 'activity-feed',
+    DISCUSSIONS: 'discussions',
     FILES: 'files',
 } as const;
 
 export const RealtimeChannels = {
     ACTIVITY_FEED: 'public:activity-feed',
+    DISCUSSIONS: 'public:discussions',
 } as const;
 
 export type ModuleId = typeof Modules[keyof typeof Modules]; 

@@ -4,10 +4,13 @@
     import { api } from '$lib/api';
     import Button from '$lib/components/Button.svelte';
     import PostCard from '$lib/components/crewnow/PostCard.svelte';
+    import Discussion from '$lib/components/Discussion.svelte';
 
     let { data }: PageProps = $props();
     const post = $derived(data.post as {
         id: string;
+        discussionId: string;
+        commentCount: number;
         author: { id: string; name: string; image: string | null };
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -47,6 +50,9 @@
         <a href="/crewnow" class="text-sm text-primary-700-300 hover:underline">← Zurück zur Timeline</a>
     </header>
     <PostCard {post} compact={false} hideOpenButton={true} onDelete={() => { errorMessage = null; showDeleteDialog = true; }} />
+    {#if post.discussionId}
+        <Discussion discussionId={post.discussionId} />
+    {/if}
 </main>
 
 {#if showDeleteDialog}

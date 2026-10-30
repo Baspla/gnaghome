@@ -4,12 +4,14 @@ import { createDatabase } from '../../db/connection';
 import { ok } from '../../lib/result';
 import { user } from '../users/schema';
 import { activityFeedItem } from './schema';
+import { DiscussionsService } from '../discussions/service';
 import { ActivityFeedService } from './service';
 
 describe('ActivityFeedService', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
     let service: ActivityFeedService;
     let broadcast: ReturnType<typeof mock>;
+    let discussions: DiscussionsService;
 
     beforeEach(async () => {
         database = await createDatabase(':memory:');
@@ -19,6 +21,7 @@ describe('ActivityFeedService', () => {
         ]);
         broadcast = mock(async () => ok(null));
         service = new ActivityFeedService(database.db, broadcast);
+        discussions = new DiscussionsService(database.db, broadcast);
     });
 
     afterEach(() => database.close());
@@ -69,10 +72,13 @@ describe('ActivityFeedService', () => {
     });
 
     it('records no more than one CrewNow activity for the same post, including concurrent retries', async () => {
+        const canonicalDiscussion = await discussions.getOrCreateDiscussion('crewnow.post', 'post-idempotent');
+        if (!canonicalDiscussion.ok) throw new Error('discussion setup failed');
         const input = {
             type: 'crewnow.image_posted' as const,
             actorUserId: 'user-1',
             target: { type: 'crewnow.post' as const, id: 'post-idempotent' },
+            discussionId: canonicalDiscussion.value.id,
             data: { imageFileId: 'file-1' },
         };
         const [first, second] = await Promise.all([
@@ -137,6 +143,9 @@ describe('ActivityFeedService', () => {
     });
 
     it('returns newest visible activities first and paginates with a stable cursor', async () => {
+        const discussionForPost = await discussions.getOrCreateDiscussion('crewnow.post', 'post-1');
+        expect(discussionForPost.ok).toBe(true);
+        if (!discussionForPost.ok) return;
         await service.recordActivity({
             type: 'profile.updated',
             actorUserId: 'user-1',
@@ -150,9 +159,13 @@ describe('ActivityFeedService', () => {
             actorUserId: 'user-2',
             subjectUserId: 'user-1',
             target: { type: 'crewnow.post', id: 'post-1' },
+            discussionId: discussionForPost.value.id,
             data: { imageFileId: 'file-1' },
             occurredAt: new Date('2026-10-28T13:00:00.000Z'),
         });
+        const discussionForPrivatePost = await discussions.getOrCreateDiscussion('crewnow.post', 'private-post');
+        expect(discussionForPrivatePost.ok).toBe(true);
+        if (!discussionForPrivatePost.ok) return;
         await service.recordActivity({
             type: 'games.game_added',
             actorUserId: 'user-1',
@@ -248,10 +261,14 @@ describe('ActivityFeedService', () => {
     });
 
     it('does not return a target activity unless the owning app authorizes the viewer', async () => {
+        const discussionForPrivatePost = await discussions.getOrCreateDiscussion('crewnow.post', 'private-post');
+        expect(discussionForPrivatePost.ok).toBe(true);
+        if (!discussionForPrivatePost.ok) return;
         await service.recordActivity({
             type: 'crewnow.image_posted',
             actorUserId: 'user-1',
             target: { type: 'crewnow.post', id: 'private-post' },
+            discussionId: discussionForPrivatePost.value.id,
             data: { imageFileId: 'file-1' },
         });
 

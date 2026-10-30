@@ -8,6 +8,8 @@
     type Person = { id: string; name: string; image: string | null };
     type Post = {
         id: string;
+        discussionId: string | null;
+        commentCount: number;
         author: Person;
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };

@@ -19,7 +19,13 @@ const broadcast = createBroadcastPublisher(
     createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
 );
 const services = createServices(database.db, broadcast, env.FILES_DIRECTORY);
-const { users: userService, activityFeed: activityFeedService, files: filesService, crewnow: crewNowService } = services;
+const {
+    users: userService,
+    activityFeed: activityFeedService,
+    discussions: discussionsService,
+    files: filesService,
+    crewnow: crewNowService,
+} = services;
 const initialFileCleanup = filesService.cleanupExpiredUploads();
 void initialFileCleanup.then((result) => {
     if (result.ok) {
@@ -40,6 +46,12 @@ const app = createApp({
     adminGroupName: env.ADMIN_GROUP_NAME,
     userService,
     activityFeedService,
+    discussionsService,
+    discussionsFeedService: discussionsService,
+    canViewDiscussionTarget: async (viewerUserId, targetType, targetId) => {
+        if (targetType !== 'crewnow.post') return false;
+        return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+    },
     filesService,
     crewNowService,
     realtimeModule: createRealtimeModule,

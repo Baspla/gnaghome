@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
-import { PlatformEventSchema, type ActivityFeedChangedEvent, type PlatformEvent } from './platform-event';
+import { PlatformEventSchema, type ActivityFeedChangedEvent, type DiscussionChangedEvent, type PlatformEvent } from './platform-event';
 import { isPlatformEvent } from './platform-event-validation';
 
 const app = new Elysia()
@@ -46,5 +46,19 @@ describe('PlatformEventSchema', () => {
             body: JSON.stringify(feedEvent),
         }));
         expect(response.status).toBe(200);
+    });
+
+    it('accepts discussion invalidations and rejects malformed IDs or comment content', () => {
+        const event: DiscussionChangedEvent = {
+            id: 'event-discussion-1',
+            occurredAt: '2026-10-28T12:00:00.000Z',
+            type: 'discussion.changed',
+            data: {},
+        };
+
+        expect(isPlatformEvent(event)).toBe(true);
+        expect(isPlatformEvent({ ...event, data: { discussionId: 'private-id' } })).toBe(false);
+        expect(isPlatformEvent({ ...event, data: { body: 'private' } })).toBe(false);
+        expect(isPlatformEvent({ ...event, type: 'discussion.deleted' })).toBe(false);
     });
 });

@@ -34,6 +34,10 @@ function makeTestApp() {
         adminGroupName: 'admins',
         userService: { getUserAsUser },
         activityFeedService: { getFeed: getActivityFeed },
+        discussionsService: {} as AppDependencies['discussionsService'],
+        discussionsFeedService: { getMessageCounts: async () => ({}) },
+        canViewDiscussionTarget: async (viewerUserId, targetType, targetId) =>
+            viewerUserId === 'user-1' && targetType === 'crewnow.post' && targetId === 'test-post-id',
         filesService: {
             uploadFile: async () => ok({} as never),
             getFile: async () => ok({} as never),

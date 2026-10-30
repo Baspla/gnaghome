@@ -79,6 +79,7 @@ export class GatewayManager {
             }
             this.subscribeToChannel("user:" + this.userId);
             this.subscribeToChannel(RealtimeChannels.ACTIVITY_FEED);
+            this.subscribeToChannel(RealtimeChannels.DISCUSSIONS);
             for (const handler of this.connectionHandlers) handler();
         });
         this.centrifuge.on("disconnected", (context) => {
