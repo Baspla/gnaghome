@@ -1,13 +1,15 @@
 <script lang="ts">
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
-    import { MessageSquareShare, SquarePen, Trash } from '@lucide/svelte';
+    import { MessageCircle, SquarePen, Trash } from '@lucide/svelte';
     import PostImage from './PostImage.svelte';
     import { formatPostDate } from './post-date';
 
     type Person = { id: string; name: string; image: string | null };
     type Post = {
         id: string;
+        discussionId: string | null;
+        commentCount: number;
         author: Person;
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -35,7 +37,11 @@
             {/if}
         </div>
         {#if !hideOpenButton}
-            <a href={`/crewnow/posts/${encodeURIComponent(post.id)}`} class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800"><MessageSquareShare class="h-4 w-4" /></a>
+            <a
+                href={`/crewnow/posts/${encodeURIComponent(post.id)}`}
+                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800"
+                aria-label={`${post.commentCount} ${post.commentCount === 1 ? 'Kommentar' : 'Kommentare'}`}
+            ><MessageCircle class="h-4 w-4" aria-hidden="true" /><span>{post.commentCount}</span></a>
         {/if}
         {#if post.canEdit}
             <a class="rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800" href={`/crewnow/posts/${encodeURIComponent(post.id)}/edit`}><SquarePen class="h-4 w-4" /></a>

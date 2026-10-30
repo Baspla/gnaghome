@@ -1,12 +1,14 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { user } from '../../platform/users/schema';
 import { storedFile } from '../../platform/files/schema';
+import { discussion } from '../../platform/discussions/schema';
 
 export const crewNowPost = sqliteTable('crewnow_post', {
     id: text('id').primaryKey(),
     authorUserId: text('author_user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
     backImageFileId: text('back_image_file_id').notNull().references(() => storedFile.id, { onDelete: 'restrict' }),
     frontImageFileId: text('front_image_file_id').notNull().references(() => storedFile.id, { onDelete: 'restrict' }),
+    discussionId: text('discussion_id').references(() => discussion.id, { onDelete: 'restrict' }),
     caption: text('caption'),
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),

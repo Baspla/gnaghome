@@ -20,6 +20,7 @@ export async function generateCentrifugoToken(user: User, deviceId: string): Pro
         `user:${user.id}`,
         `device:${user.id}:${deviceId}`,
         RealtimeChannels.ACTIVITY_FEED,
+        RealtimeChannels.DISCUSSIONS,
         'presence',
     ];
     return generateCentrifugoTokenForChannels(user, channels);

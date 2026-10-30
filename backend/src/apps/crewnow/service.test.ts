@@ -9,6 +9,7 @@ import { user } from '../../platform/users/schema';
 import { FilesService } from '../../platform/files/service';
 import { LocalFileStorage } from '../../platform/files/storage';
 import { CrewNowService } from './service';
+import { DiscussionsService } from '../../platform/discussions/service';
 
 const PNG_BYTES = Uint8Array.from(Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pJ8AAAAASUVORK5CYII=',
@@ -22,6 +23,7 @@ describe('CrewNowService', () => {
     let service: CrewNowService;
     let recordActivity: ReturnType<typeof mock>;
     let invalidateFeed: ReturnType<typeof mock>;
+    let discussions: DiscussionsService;
 
     async function uploadImage(userId = 'user-1') {
         const result = await files.uploadFile(userId, PNG_BYTES);
@@ -36,7 +38,8 @@ describe('CrewNowService', () => {
         recordActivity = mock(async () => ok({}));
         invalidateFeed = mock(async () => {});
         const activityFeed = { recordActivity, invalidateFeed } as unknown as ActivityFeedService;
-        service = new CrewNowService(database.db, files, activityFeed);
+        discussions = new DiscussionsService(database.db, async () => ok(null));
+        service = new CrewNowService(database.db, files, activityFeed, discussions);
         await database.db.insert(user).values([
             { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
@@ -79,9 +82,42 @@ describe('CrewNowService', () => {
             target: { type: 'crewnow.post', id: 'post-1' },
             data: { imageFileId: backImageFileId },
         });
+        const createdPost = result.ok ? result.value : null;
+        expect(createdPost?.discussionId).toBeTruthy();
+        if (createdPost?.discussionId) {
+            expect(typeof createdPost.discussionId).toBe('string');
+            expect(await discussions.getDiscussion(createdPost.discussionId)).toMatchObject({ ok: true, value: { targetType: 'crewnow.post', targetId: 'post-1' } });
+        }
         expect(invalidateFeed).not.toHaveBeenCalled();
         expect((await files.getFile(backImageFileId, 'user-2')).ok).toBe(true);
         expect((await files.getFile(frontImageFileId, 'user-2')).ok).toBe(true);
+    });
+
+    it('returns the persisted discussion comment count with CrewNow post summaries', async () => {
+        const created = await service.createPost('user-1', {
+            id: 'post-comment-count',
+            backImageFileId: await uploadImage(),
+            frontImageFileId: await uploadImage(),
+            caption: null,
+            taggedUserIds: [],
+        });
+        expect(created.ok).toBe(true);
+        if (!created.ok) return;
+
+        expect(created.value.commentCount).toBe(0);
+        expect(await discussions.createMessage(created.value.discussionId!, 'user-2', 'Eins'))
+            .toMatchObject({ ok: true });
+        expect(await discussions.createMessage(created.value.discussionId!, 'user-3', 'Zwei'))
+            .toMatchObject({ ok: true });
+
+        expect(await service.getPost('user-2', 'post-comment-count')).toMatchObject({
+            ok: true,
+            value: { discussionId: created.value.discussionId, commentCount: 2 },
+        });
+        expect(await service.getTimeline('user-2')).toMatchObject({
+            ok: true,
+            value: { items: [{ id: 'post-comment-count', commentCount: 2 }] },
+        });
     });
 
     it('does not duplicate the post or activity when creation is retried with the same ID', async () => {
@@ -185,6 +221,9 @@ describe('CrewNowService', () => {
         await service.createPost('user-1', {
             id: 'post-delete', backImageFileId, frontImageFileId, caption: null, taggedUserIds: [],
         });
+        const post = await service.getPost('user-1', 'post-delete');
+        expect(post.ok).toBe(true);
+        const discussionId = post.ok ? post.value.discussionId : null;
 
         expect(await service.deletePost('user-2', 'post-delete')).toMatchObject({ ok: false, error: { status: 403 } });
         expect(await service.deletePost('user-1', 'post-delete')).toEqual({ ok: true, value: null });
@@ -192,6 +231,7 @@ describe('CrewNowService', () => {
         expect(await files.getFile(backImageFileId, 'user-1')).toMatchObject({ ok: false });
         expect(await files.getFile(frontImageFileId, 'user-1')).toMatchObject({ ok: false });
         expect(invalidateFeed).toHaveBeenCalledTimes(1);
+        if (discussionId) expect(await discussions.getDiscussion(discussionId)).toMatchObject({ ok: false, error: { status: 404 } });
     });
 
     it('discards only the authenticated user’s unreferenced pending upload', async () => {

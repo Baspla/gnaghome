@@ -42,6 +42,7 @@ export type RecordActivityInput =
         actorUserId: string;
         subjectUserId?: string | null;
         target: ActivityTarget & { type: 'crewnow.post' };
+        discussionId: string;
         data: ActivityDataByType['crewnow.image_posted'];
     })
     | (ActivityInputBase<'profile.updated'> & {
@@ -76,6 +77,7 @@ export type ActivityFeedRecord = {
     subjectUserId: string | null;
     targetType: string | null;
     targetId: string | null;
+    discussionId: string | null;
     data: ActivityDataByType[ActivityType];
     occurredAt: Date;
     createdAt: Date;
@@ -171,6 +173,7 @@ function toRecord(row: typeof activityFeedItem.$inferSelect): ActivityFeedRecord
         subjectUserId: row.subjectUserId,
         targetType: row.targetType,
         targetId: row.targetId,
+        discussionId: row.discussionId,
         data,
         occurredAt: row.occurredAt,
         createdAt: row.createdAt,
@@ -238,6 +241,8 @@ export class ActivityFeedService {
         }
     }
 
+
+
     async recordActivity(input: RecordActivityInput): Promise<Result<ActivityFeedRecord, BadRequestError | InternalError>> {
         if (!isPlainObject(input)
             || !isActivityType(input.type)
@@ -250,6 +255,12 @@ export class ActivityFeedService {
                 || !isNamespacedTargetType(input.type, input.target.type)
                 || typeof input.target.id !== 'string'
                 || input.target.id.trim().length === 0
+            ))
+            || (input.type === 'crewnow.image_posted' && (
+                typeof input.discussionId !== 'string' || input.discussionId.trim().length === 0
+            ))
+            || ('discussionId' in input && input.discussionId !== undefined && (
+                typeof input.discussionId !== 'string' || input.discussionId.trim().length === 0
             ))
             || (input.occurredAt !== undefined && !isValidDate(input.occurredAt))) {
             return err({ status: 400, code: 'BAD_REQUEST', message: 'Invalid activity type or payload' });
@@ -273,6 +284,7 @@ export class ActivityFeedService {
                 subjectUserId: input.subjectUserId ?? null,
                 targetType: input.target?.type ?? null,
                 targetId: input.target?.id ?? null,
+                discussionId: input.type === 'crewnow.image_posted' ? input.discussionId : null,
                 data: JSON.stringify(input.data),
                 occurredAt,
             }).returning().get();

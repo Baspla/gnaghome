@@ -48,11 +48,11 @@
 </script>
 
 <figure class={['w-full pb-4', className]}>
-    <div class="relative overflow-hidden rounded-xl bg-surface-200-800">
+    <div class="relative min-h-72 aspect-[4/3] overflow-hidden rounded-xl bg-surface-200-800">
         <img
             src={mainImage}
             alt={alt}
-            class="block h-auto w-full"
+            class="absolute inset-0 block h-full w-full object-contain"
             onpointerdown={startHold}
             onpointerup={endHold}
             onpointerleave={endHold}
@@ -62,13 +62,13 @@
         {#if overlayImage}
             <button
                 type="button"
-                class="absolute right-3 top-3 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg transition-opacity"
+                class="absolute right-3 top-3 aspect-[4/3] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg transition-opacity"
                 class:opacity-0={overlayHidden}
                 class:pointer-events-none={overlayHidden}
                 aria-label="Vorder- und Rückkamera-Bilder vertauschen"
                 onclick={swapImages}
             >
-                <img src={overlayImage} alt="Vorderkamera-Aufnahme" class="block h-auto w-full object-cover" />
+                <img src={overlayImage} alt="Vorderkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-contain" />
             </button>
         {/if}
     </div>

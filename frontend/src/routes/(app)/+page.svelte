@@ -6,6 +6,7 @@
     import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
+    import { ChevronRight, MessageCircle } from '@lucide/svelte';
     import { setPageTitle } from '$lib/utils';
 
     type Activity = {
@@ -14,6 +15,8 @@
         actor: { id: string; name: string; image: string | null } | null;
         subject: { id: string; name: string; image: string | null } | null;
         target: { type: string; id: string } | null;
+        discussionId: string | null;
+        commentCount: number;
         data: { changedFields?: Array<'name' | 'image'>; imageFileId?: string; taggedUsers?: Array<{ id: string; name: string; image: string | null }> };
         occurredAt: string;
     };
@@ -101,7 +104,7 @@
         {:else}
             <ol class="divide-y divide-surface-300-700/40">
                 {#each activities as activity (activity.id)}
-                    <li class="flex gap-4 px-4 py-5 sm:px-6">
+                    <li class="flex items-stretch gap-3 px-4 py-5 sm:gap-4 sm:px-6">
                         <div class="flex shrink-0 -space-x-2">
                             {#if activity.actor}
                                 <ProfilePicture
@@ -169,6 +172,19 @@
                                 {dateFormatter.format(new Date(activity.occurredAt))}
                             </time>
                         </div>
+                        {#if activity.type === 'crewnow.image_posted' && activity.discussionId && activity.target?.type === 'crewnow.post'}
+                            <div class="ml-auto flex shrink-0 items-center self-stretch">
+                                <a
+                                    href={`/crewnow/posts/${encodeURIComponent(activity.target.id)}`}
+                                    class="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm text-surface-600-400 transition-colors hover:bg-surface-200-800 hover:text-primary-700-300 sm:px-3"
+                                    aria-label={`${activity.commentCount} ${activity.commentCount === 1 ? 'Kommentar' : 'Kommentare'} öffnen`}
+                                >
+                                    <MessageCircle class="h-4 w-4" aria-hidden="true" />
+                                    <span>{activity.commentCount}</span>
+                                    <ChevronRight class="h-4 w-4" aria-hidden="true" />
+                                </a>
+                            </div>
+                        {/if}
                     </li>
                 {/each}
             </ol>

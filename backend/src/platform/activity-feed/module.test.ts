@@ -9,6 +9,7 @@ import type { UserService } from '../users/service';
 import { ActivityFeedService } from './service';
 import { createActivityFeedModule } from './module';
 import type { CrewNowService } from '../../apps/crewnow/service';
+import { DiscussionsService } from '../discussions/service';
 
 describe('activity feed HTTP module', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
@@ -17,6 +18,8 @@ describe('activity feed HTTP module', () => {
     let canViewUser: (viewerId: string, targetUserId: string) => boolean;
     let currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
     let postExists = true;
+    let discussions: DiscussionsService;
+    let discussionId = '';
 
     const getUserAsUser: UserService['getUserAsUser'] = async (viewerId, targetUserId) => {
         if (!canViewUser(viewerId, targetUserId)) {
@@ -39,7 +42,9 @@ describe('activity feed HTTP module', () => {
             getActivityTaggedUsers: async (_viewerId, ids) => currentPostTags.filter((person) => ids.includes(person.id)),
             getTagIdsForPost: async () => currentPostTags.map((person) => person.id),
         };
-        return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }, crewNowService));
+        return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }, crewNowService, {
+            getMessageCounts: (ids) => discussions.getMessageCounts(ids),
+        }));
     }
 
     beforeEach(async () => {
@@ -51,6 +56,10 @@ describe('activity feed HTTP module', () => {
             { id: 'private-1', name: 'Private User', email: 'private@example.test' },
         ]);
         service = new ActivityFeedService(database.db, async () => ok(null));
+        discussions = new DiscussionsService(database.db, async () => ok(null));
+        const createdDiscussion = await discussions.getOrCreateDiscussion('crewnow.post', 'post-1');
+        if (!createdDiscussion.ok) throw new Error('discussion setup failed');
+        discussionId = createdDiscussion.value.id;
         session = {
             user: {
                 id: 'viewer-1',
@@ -79,6 +88,9 @@ describe('activity feed HTTP module', () => {
     });
 
     it('returns authorized profile and CrewNow activities with public actor and live tagged users', async () => {
+        await discussions.createMessage(discussionId, 'actor-1', 'Kommentar eins');
+        await discussions.createMessage(discussionId, 'subject-1', 'Kommentar zwei');
+        await discussions.createMessage(discussionId, 'viewer-1', 'Kommentar drei');
         await service.recordActivity({
             type: 'profile.updated',
             actorUserId: 'actor-1',
@@ -99,6 +111,7 @@ describe('activity feed HTTP module', () => {
             type: 'crewnow.image_posted',
             actorUserId: 'actor-1',
             target: { type: 'crewnow.post', id: 'post-1' },
+            discussionId,
             data: { imageFileId: 'file-1' },
             occurredAt: new Date('2026-10-28T14:00:00.000Z'),
         });
@@ -112,6 +125,8 @@ describe('activity feed HTTP module', () => {
                 type: 'crewnow.image_posted',
                 actor: { id: 'actor-1', name: 'Alice', image: 'https://example.test/alice.png' },
                 data: { imageFileId: 'file-1', taggedUsers: [{ id: 'tag-1', name: 'Tag One', image: null }] },
+                discussionId,
+                commentCount: 3,
             }, {
                 type: 'profile.updated',
                 actor: { id: 'actor-1', name: 'Alice', image: 'https://example.test/alice.png' },
@@ -131,6 +146,7 @@ describe('activity feed HTTP module', () => {
             type: 'crewnow.image_posted',
             actorUserId: 'actor-1',
             target: { type: 'crewnow.post', id: 'post-1' },
+            discussionId,
             data: { imageFileId: 'file-1' },
         });
 

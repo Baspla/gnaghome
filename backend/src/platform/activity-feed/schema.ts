@@ -1,6 +1,7 @@
 import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { user } from '../users/schema';
+import { discussion } from '../discussions/schema';
 
 /**
  * Durable app-generated feed entries. Targets intentionally have no foreign
@@ -13,6 +14,7 @@ export const activityFeedItem = sqliteTable('activity_feed_item', {
     subjectUserId: text('subject_user_id').references(() => user.id, { onDelete: 'set null' }),
     targetType: text('target_type'),
     targetId: text('target_id'),
+    discussionId: text('discussion_id').references(() => discussion.id, { onDelete: 'set null' }),
     data: text('data').notNull().default('{}'),
     occurredAt: integer('occurred_at', { mode: 'timestamp' }).notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' })

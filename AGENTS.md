@@ -12,6 +12,7 @@
 ## Frontend UI direction
 
 - Write user-facing frontend text in German, including labels, buttons, headings, helper and error messages, and accessible names. Keep technical identifiers, code symbols, and third-party product names in their original form where appropriate.
+- Do not use hash-fragment URLs (`#...`) for frontend navigation; link to the route without a fragment rather than relying on anchor scrolling.
 - Use shared primary navigation on the left on desktop and at the bottom on mobile; each app owns the layout and content of its own views beyond that shared navigation.
 - Build consistent reusable controls across apps (for example buttons and inputs) on Bits UI primitives. Put shared controls in the frontend's shared component layer (`frontend/src/lib/components/`); app-specific presentation belongs with that app. Prefer the shared control over one-off app-specific variants when the interaction is common.
 - Keep Bits UI as the accessible behavioral foundation and apply the project's shared styling through reusable wrappers, rather than letting each app style or compose common controls independently.
