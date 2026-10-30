@@ -37,6 +37,7 @@ import { onDestroy, tick } from 'svelte';
     let cameraStream: MediaStream | null = null;
     let videoElement: HTMLVideoElement | undefined = $state();
     let createPostId = $state('');
+    let firstCaptureFacing = $state<CameraFacing | null>(null);
 
     let backPreviewUrl = $state('');
     let frontPreviewUrl = $state('');
@@ -204,8 +205,8 @@ import { onDestroy, tick } from 'svelte';
     }
 
     function setPreviewUrls(backUrl: string, frontUrl: string) {
-        if (backPreviewUrl.startsWith('blob:')) URL.revokeObjectURL(backPreviewUrl);
-        if (frontPreviewUrl.startsWith('blob:')) URL.revokeObjectURL(frontPreviewUrl);
+        if (backPreviewUrl.startsWith('blob:') && backPreviewUrl !== backUrl) URL.revokeObjectURL(backPreviewUrl);
+        if (frontPreviewUrl.startsWith('blob:') && frontPreviewUrl !== frontUrl) URL.revokeObjectURL(frontPreviewUrl);
         backPreviewUrl = backUrl;
         frontPreviewUrl = frontUrl;
     }
@@ -225,15 +226,10 @@ import { onDestroy, tick } from 'svelte';
                 reject(new Error('Das Foto konnte nicht aufgenommen werden.'));
                 return;
             }
-            if (cameraFacing === 'user') {
-                context.translate(canvas.width, 0);
-                context.scale(-1, 1);
-            }
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Das Foto konnte nicht gespeichert werden.')), 'image/jpeg', 0.9);
         });
     }
-
     async function captureBoth() {
         const run = ++captureRun;
         isCapturing = true;
@@ -241,31 +237,47 @@ import { onDestroy, tick } from 'svelte';
         try {
             const firstFacing = cameraFacing;
             const first = await takePhoto();
+            if (run !== captureRun) return;
+
+            firstCaptureFacing = firstFacing;
+            const firstPreviewUrl = URL.createObjectURL(first);
+            setPreviewUrls(
+                firstFacing === 'environment' ? firstPreviewUrl : '',
+                firstFacing === 'user' ? firstPreviewUrl : '',
+            );
+
             await startCamera(firstFacing === 'environment' ? 'user' : 'environment');
             if (run !== captureRun) return;
             if (currentStep !== 'preview') throw new Error(errorMessage ?? 'Die zweite Kamera konnte nicht gestartet werden.');
+
             // Give camera switching a full second: iOS Safari can settle facing-mode changes late.
             await new Promise((resolve) => setTimeout(resolve, 1000));
             if (!videoElement) throw new Error('Kameravorschau ist nicht verfügbar.');
             await waitForVideoFrame(videoElement);
             if (run !== captureRun) return;
+
             const second = await takePhoto();
+            if (run !== captureRun) return;
+
             if (firstFacing === 'environment') {
                 backBlob = first;
                 frontBlob = second;
+                setPreviewUrls(backPreviewUrl, URL.createObjectURL(second));
             } else {
                 frontBlob = first;
                 backBlob = second;
+                setPreviewUrls(URL.createObjectURL(second), frontPreviewUrl);
             }
-            backPreviewUrl = URL.createObjectURL(firstFacing === 'environment' ? first : second);
-            frontPreviewUrl = URL.createObjectURL(firstFacing === 'user' ? first : second);
             isShowingBack = true;
             currentStep = 'captured';
+            firstCaptureFacing = null;
             stopCamera();
             beginEarlyUploads(run);
         } catch (error) {
             errorMessage = error instanceof Error ? error.message : 'Die Bilder konnten nicht aufgenommen werden.';
             stopCamera();
+            firstCaptureFacing = null;
+            setPreviewUrls('', '');
             currentStep = 'inactive';
         } finally {
             isCapturing = false;
@@ -324,7 +336,7 @@ import { onDestroy, tick } from 'svelte';
     }
 
     async function switchCamera() {
-        if (isSwitchingCamera || isCapturing) return;
+        if (isSwitchingCamera || isCapturing || firstCaptureFacing !== null) return;
         isSwitchingCamera = true;
         try {
             await startCamera(cameraFacing === 'environment' ? 'user' : 'environment');
@@ -448,7 +460,21 @@ import { onDestroy, tick } from 'svelte';
             </section>
         {:else if currentStep === 'preview'}
             <section class="space-y-4 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
-                <video bind:this={videoElement} class="mx-auto max-h-[65vh] w-full rounded-xl bg-surface-950 object-contain" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
+                <div class="relative mx-auto w-full aspect-[3/4] overflow-hidden rounded-xl bg-surface-950">
+                    {#if firstCaptureFacing === 'environment'}
+                        <img src={backPreviewUrl} alt="Rückkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
+                        <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
+                            <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
+                        </div>
+                    {:else if firstCaptureFacing === 'user'}
+                        <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
+                        <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
+                            <img src={frontPreviewUrl} alt="Frontkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
+                        </div>
+                    {:else}
+                        <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
+                    {/if}
+                </div>
                 <div class="flex justify-center gap-3">
                     <Button type="button" variant="outlined" onclick={() => void switchCamera()} disabled={isCapturing || isSwitchingCamera}>{isSwitchingCamera ? 'Kamera wird gewechselt …' : 'Kamera wechseln'}</Button>
                     <Button type="button" onclick={() => void captureBoth()} disabled={isCapturing}>{isCapturing ? 'Aufnahme läuft …' : 'Aufnehmen'}</Button>
@@ -458,10 +484,10 @@ import { onDestroy, tick } from 'svelte';
         {:else}
             <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
                 <h2 class="text-lg font-semibold text-surface-950-50">Vorschau</h2>
-                <div class="relative">
-                    <img src={primaryPhoto} alt={isShowingBack ? 'Rückkamera-Aufnahme' : 'Frontkamera-Aufnahme'} class="max-h-[65vh] w-full rounded-xl object-contain" />
-                    <button type="button" class="absolute right-3 top-3 w-1/4 overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
-                        <img src={smallPhoto} alt={isShowingBack ? 'Frontkamera-Aufnahme' : 'Rückkamera-Aufnahme'} class="w-full" />
+                <div class="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-surface-950">
+                    <img src={primaryPhoto} alt={isShowingBack ? 'Rückkamera-Aufnahme' : 'Frontkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
+                    <button type="button" class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
+                        <img src={smallPhoto} alt={isShowingBack ? 'Frontkamera-Aufnahme' : 'Rückkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
                     </button>
                 </div>
                 <div class="flex justify-center">
