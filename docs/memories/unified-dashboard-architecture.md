@@ -132,6 +132,10 @@ When adding a realtime event, define its literal discriminator and payload schem
 
 `backend/src/platform/discussions/` stores one canonical `discussion` per namespaced target and ordered `discussion_message` rows. Each consuming app supplies a `canViewDiscussionTarget` authorization contract; the platform module resolves the target and applies that contract before message reads and writes. Any authenticated user may comment, but only the message author may edit or delete. Edits set `edited_at`; message create/edit/delete publishes content-free `discussion.changed` and `activity-feed.changed` invalidations. CrewNow posts and feed rows reference the same discussion ID, feed comment counts are computed from persisted messages, and the shared `Discussion.svelte` panel refetches after invalidations or reconnect. The initial migration backfills existing posts; a later idempotent repair migration covers pre-existing installations that applied the feature schema before the backfill was added. This is implemented for CrewNow; future apps must add their target authorization to the app-level callback before attaching Discussions.
 
+### Hash-fragment navigation decision
+
+Do not use hash-fragment URLs (`#...`) for frontend navigation. The CrewNow activity-feed comment-count link previously appended `#comments`, but opening that URL did not reliably bring the discussion into view in the app's scroll layout; the post could open with its image visible while the comments remained below the viewport. The agreed behavior is to remove the fragment and open the post route normally. Do not add custom fragment-scrolling behavior unless the product direction changes.
+
 ## UI direction
 
 Use shared primary navigation: a left-side navigation bar on desktop and a bottom navigation bar on mobile. This shared navigation provides entry points to the apps and shared platform areas, but does not prescribe a common page layout for them. Each app owns its view hierarchy, content, and any app-specific navigation beyond the shared primary navigation.

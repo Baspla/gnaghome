@@ -5,6 +5,7 @@
     import Button from '$lib/components/Button.svelte';
     import PostCard from '$lib/components/crewnow/PostCard.svelte';
     import Discussion from '$lib/components/Discussion.svelte';
+    import { ChevronLeftIcon } from '@lucide/svelte';
 
     let { data }: PageProps = $props();
     const post = $derived(data.post as {
@@ -47,7 +48,7 @@
 
 <main class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-5 px-4 py-7 sm:px-6">
     <header class="flex items-center justify-between gap-4">
-        <a href="/crewnow" class="text-sm text-primary-700-300 hover:underline">← Zurück zur Timeline</a>
+        <a href="/crewnow" class="text-sm text-primary-700-300 hover:underline inline-flex"><ChevronLeftIcon /> Zurück zur Timeline</a>
     </header>
     <PostCard {post} compact={false} hideOpenButton={true} onDelete={() => { errorMessage = null; showDeleteDialog = true; }} />
     {#if post.discussionId}

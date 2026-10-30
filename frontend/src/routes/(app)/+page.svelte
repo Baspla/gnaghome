@@ -175,7 +175,7 @@
                         {#if activity.type === 'crewnow.image_posted' && activity.discussionId && activity.target?.type === 'crewnow.post'}
                             <div class="ml-auto flex shrink-0 items-center self-stretch">
                                 <a
-                                    href={`/crewnow/posts/${encodeURIComponent(activity.target.id)}#comments`}
+                                    href={`/crewnow/posts/${encodeURIComponent(activity.target.id)}`}
                                     class="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm text-surface-600-400 transition-colors hover:bg-surface-200-800 hover:text-primary-700-300 sm:px-3"
                                     aria-label={`${activity.commentCount} ${activity.commentCount === 1 ? 'Kommentar' : 'Kommentare'} öffnen`}
                                 >
