@@ -34,6 +34,10 @@ function makeTestApp() {
         adminGroupName: 'admins',
         userService: { getUserAsUser },
         activityFeedService: { getFeed: getActivityFeed },
+        filesService: {
+            uploadFile: async () => ok({} as never),
+            getFile: async () => ok({} as never),
+        },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });

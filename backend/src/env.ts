@@ -23,6 +23,7 @@ if (!oauthDiscoveryUrl || !oauthClientId || !oauthClientSecret) {
 
 export const env = {
     DATABASE_URL: requireEnv('GNAGHOME_DATABASE_URL'),
+    FILES_DIRECTORY: readEnv('GNAGHOME_FILES_DIRECTORY') ?? 'data/files',
     BETTER_AUTH_URL: readEnv('GNAGHOME_BETTER_AUTH_URL') ?? 'http://localhost:5173',
     BETTER_AUTH_SECRET: readEnv('GNAGHOME_BETTER_AUTH_SECRET') ?? '',
     HOSTNAME: readEnv('GNAGHOME_HOSTNAME') ?? 'http://localhost:5173',

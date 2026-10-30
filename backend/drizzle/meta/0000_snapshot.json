@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c4007257-498c-4b6b-806a-3e3451bce408",
+  "id": "f9a7816c-ef10-4a91-bf24-717edec413ef",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "account": {
@@ -142,8 +142,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "counter": {
-      "name": "counter",
+    "activity_feed_item": {
+      "name": "activity_feed_item",
       "columns": {
         "id": {
           "name": "id",
@@ -152,20 +152,132 @@
           "notNull": true,
           "autoincrement": false
         },
-        "count": {
-          "name": "count",
-          "type": "integer",
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "subject_user_id": {
+          "name": "subject_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": "'{}'"
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "activity_feed_item_order_idx": {
+          "name": "activity_feed_item_order_idx",
+          "columns": [
+            "occurred_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "activity_feed_item_actor_idx": {
+          "name": "activity_feed_item_actor_idx",
+          "columns": [
+            "actor_user_id"
+          ],
+          "isUnique": false
+        },
+        "activity_feed_item_subject_idx": {
+          "name": "activity_feed_item_subject_idx",
+          "columns": [
+            "subject_user_id"
+          ],
+          "isUnique": false
+        },
+        "activity_feed_item_target_idx": {
+          "name": "activity_feed_item_target_idx",
+          "columns": [
+            "target_type",
+            "target_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "activity_feed_item_actor_user_id_user_id_fk": {
+          "name": "activity_feed_item_actor_user_id_user_id_fk",
+          "tableFrom": "activity_feed_item",
+          "tableTo": "user",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "activity_feed_item_subject_user_id_user_id_fk": {
+          "name": "activity_feed_item_subject_user_id_user_id_fk",
+          "tableFrom": "activity_feed_item",
+          "tableTo": "user",
+          "columnsFrom": [
+            "subject_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "activity_feed_item_target_pair_check": {
+          "name": "activity_feed_item_target_pair_check",
+          "value": "(\"activity_feed_item\".\"target_type\" is null) = (\"activity_feed_item\".\"target_id\" is null)"
+        }
+      }
     },
     "session": {
       "name": "session",

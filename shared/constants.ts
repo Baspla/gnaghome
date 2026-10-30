@@ -3,6 +3,7 @@ export const Modules = {
     AUTH: 'auth',
     REALTIME: 'realtime',
     ACTIVITY_FEED: 'activity-feed',
+    FILES: 'files',
 } as const;
 
 export const RealtimeChannels = {

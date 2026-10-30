@@ -18,8 +18,20 @@ const database = await createDatabase(env.DATABASE_URL, `${import.meta.dir}/../d
 const broadcast = createBroadcastPublisher(
     createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
 );
-const services = createServices(database.db, broadcast);
-const { users: userService, activityFeed: activityFeedService } = services;
+const services = createServices(database.db, broadcast, env.FILES_DIRECTORY);
+const { users: userService, activityFeed: activityFeedService, files: filesService } = services;
+const initialFileCleanup = filesService.cleanupExpiredUploads();
+void initialFileCleanup.then((result) => {
+    if (result.ok) {
+        logger.info('expired file upload cleanup finished', { deletedFiles: result.value });
+    } else {
+        logger.warn('expired file upload cleanup failed; hourly retry is scheduled', { error: result.error.message });
+    }
+});
+const fileCleanupTimer = setInterval(() => {
+    void filesService.cleanupExpiredUploads();
+}, 60 * 60 * 1000);
+fileCleanupTimer.unref();
 const auth = createAuth(database.db, userService);
 
 const app = createApp({
@@ -28,6 +40,7 @@ const app = createApp({
     adminGroupName: env.ADMIN_GROUP_NAME,
     userService,
     activityFeedService,
+    filesService,
     realtimeModule: createRealtimeModule,
     generateRealtimeToken: generateCentrifugoToken,
 }).listen(3000);
@@ -38,6 +51,7 @@ const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info('shutdown signal received', { signal });
+    clearInterval(fileCleanupTimer);
     database.close();
     process.exit(0);
 };

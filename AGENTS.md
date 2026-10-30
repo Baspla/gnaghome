@@ -39,7 +39,7 @@
 - If Centrifugo is unreachable during local development, first check whether its Docker container is running and whether Docker itself is started in the WSL/host environment before treating it as an application defect.
 - Keep provider-specific integration behavior and data owned by its integration module. Cross-module access should use explicit services/contracts, not direct writes into another module's tables.
 - Treat external service credentials, OIDC group claims, and uploaded media as untrusted/sensitive input. Validate inputs, enforce access checks server-side, and do not log secrets or tokens.
-- Database changes must use Drizzle schema and migrations. Do not rewrite migration history or discard existing user data to simplify a refactor. Take care with any destructive schema or data change.
+- Database changes must use Drizzle schema and migrations. Generate migration files with the workspace `bun run db:generate` script from the repository root; do not invoke Drizzle Kit directly. Do not rewrite migration history or discard existing user data to simplify a refactor. Take care with any destructive schema or data change.
 
 ## Development workflow
 

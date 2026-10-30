@@ -6,6 +6,8 @@
 
 Gnaghome is moving away from being a chat and voice application. The intended product is a unified dashboard that brings together different services (initial examples: Steam, Discord, and Minecraft) that are currently separate. The goal is a small, self-hostable application for a known group, not a large public multi-tenant platform.
 
+The intended audience is a close friend group. Prefer a simple permission model over elaborate sharing hierarchies: for each action, decide whether it is available to everyone in the group, only the author/owner, or only an admin. “Everyone” means authenticated Gnaghome users in this group, not the public. Apps still own their resources and enforce the applicable rule on the backend.
+
 ## Keep, cut, and add
 
 ### Keep as foundations
@@ -31,8 +33,18 @@ Retiring a feature does not imply immediately dropping its database tables. Pres
 - A central feed of app-generated activity, with entries referencing the originating app objects and access governed by those apps.
 - A durable audit log of changes across apps and platform systems, including create/update/delete actions. This is separate from social feed and provider activity; only admins may read audit records, with authorization enforced by the backend.
 - Durable normalized activity collected from external services for consumers such as Stats; this is distinct from app-generated feed events.
-- Notifications, comments and reactions on supported dashboard items, and a shared media/upload service as concrete use cases require them. When an object appears in the feed and on its app page, both views use the same canonical comments and reactions rather than separate copies.
-- A persistent background-job mechanism for provider polling/sync, retries, upload processing, and related asynchronous work.
+- Notifications, comments and reactions on supported dashboard items, and shared Files capability for uploads. When an object appears in the feed and on its app page, both views use the same canonical comments and reactions rather than separate copies.
+- A persistent background-job mechanism for provider polling/sync, retries, and related asynchronous work. Image upload is currently synchronous; adding image processing remains future work.
+
+### Shared Files capability
+
+Files is a general-purpose platform capability, not CrewNow-owned media logic. Start with image uploads/retrieval; add other media/file categories only for concrete use cases. Store bytes on local disk beneath the backend's existing Docker-persisted data volume, and keep file metadata in SQLite. Do not expose the storage directory as a public static directory: provide stable `/api/v1/files/<opaque-id>` read URLs through the backend, with an active Gnaghome session required (the deployment's oauth2proxy is an additional outer gate, not a substitute). This path also matches production routing, where `/api` requests go to the backend and other paths go to the frontend.
+
+Each file records its uploader and a `private` flag, plus a lifecycle status and optional pending-upload expiry. New uploads are pending and private to the uploader for 24 hours; the uploader may preview them during that period. Finalization is an internal, idempotent service operation for the owning app to call after persisting a reference; it marks the file ready, clears expiry, and sets its ready-file visibility. Ready non-private files are readable by any signed-in Gnaghome user; ready private files are readable only by their uploader. Pending files are unavailable to other users, and deleting files are hidden. Knowing the opaque ID alone grants no access. There is no generic HTTP delete/finalize endpoint: the app owning a file reference must authorize and update/delete that resource before calling the Files service internally to finalize or remove an unreferenced file. Startup and hourly cleanup removes expired pending uploads and retries records marked deleting after a storage failure. App-triggered deletion also marks the file deleting before removing bytes so a failed storage operation can be retried safely. This is a small Files-owned default rule, not a general resource-sharing system; apps may keep richer resource authorization in their own domain when needed. Storage mechanics sit behind a service interface so a different storage backend can be considered later without coupling apps to local paths. Backups of the Docker data volume must include both SQLite and the files directory for a complete restore.
+
+The initial image scope should validate supported image types from file content, cap upload sizes, avoid user-controlled storage paths, and return safe inline image responses. Decisions about image transcoding/EXIF stripping and future object-storage support remain open until a concrete need justifies their added dependency/complexity.
+
+Current implementation: `backend/src/platform/files` provides authenticated image upload and read, internal finalization/deletion, and startup/hourly expired-pending cleanup. It stores metadata in SQLite and bytes under `GNAGHOME_FILES_DIRECTORY` (default `backend/data/files`, mounted under the existing Docker data volume in deployment). Reads use `/api/v1/files/<id>`, matching the production `/api` backend route. The accepted formats are PNG, JPEG, GIF, WebP, AVIF, and APNG, with a 10 MiB limit; content type is detected with the `file-type` library. The initial version does not transcode or strip EXIF metadata.
 
 ## Backend organization
 
@@ -44,8 +56,7 @@ backend/src/
     auth/
     users/
     realtime/     # Centrifugo transport and platform event delivery
-    media/        # Add when shared upload/storage use cases arrive
-    comments/     # Add when shared commenting use cases arrive
+    files/        # Shared image upload/storage capability
     notifications/
     jobs/
   apps/           # User-facing dashboard areas; each owns its data and rules
@@ -58,7 +69,7 @@ backend/src/
     minecraft/
 ```
 
-The current active modules have been grouped under `platform/auth`, `platform/users`, and `platform/realtime`. The Realtime module retains the existing `/gateway` API prefix for compatibility. The `apps/` and `integrations/` directories contain boundary guidance for future modules; create a feature directory there when a real app or connector is added, not as an empty framework in advance. A product area such as Photos owns photo/album behavior and its authorization, while shared Media infrastructure owns reusable upload/storage mechanics. Integrations contribute through explicit contracts and must not write directly into app-owned tables. These are source-code boundaries inside one deployment, not separate services or a plugin framework.
+The current active platform modules include `platform/auth`, `platform/users`, `platform/realtime`, and `platform/files`. The Realtime module retains the existing `/gateway` API prefix for compatibility. The `apps/` and `integrations/` directories contain boundary guidance for future modules; create a feature directory there when a real app or connector is added, not as an empty framework in advance. A product area such as CrewNow owns post behavior and its authorization, while Files owns reusable upload/storage mechanics and its general private-file rule. Integrations contribute through explicit contracts and must not write directly into app-owned tables. These are source-code boundaries inside one deployment, not separate services or a plugin framework.
 
 ## Integration and data boundaries
 
@@ -93,7 +104,7 @@ OIDC group claims remain available on the authenticated backend user for module-
 ### Backend transition status
 
 - Authenticated backend requests now derive `user.isAdmin` from the configured `GNAGHOME_ADMIN_GROUP` and expose normalized OIDC groups to backend modules.
-- Shared backend foundations live under `backend/src/platform/auth`, `backend/src/platform/users`, and `backend/src/platform/realtime`; `backend/src/apps/` and `backend/src/integrations/` hold boundary guidance for future domains/connectors, not implemented feature modules.
+- Shared backend foundations live under `backend/src/platform/auth`, `backend/src/platform/users`, `backend/src/platform/realtime`, and `backend/src/platform/files`; `backend/src/apps/` and `backend/src/integrations/` hold boundary guidance for future domains/connectors, not implemented feature modules.
 - The `/users/me` response exposes `isAdmin`; it is presentation data and does not secure other routes by itself.
 - This remains foundational plumbing: future dashboard resource modules still need to implement and test their own user-scoped ownership/sharing rules.
 - Chat and LiveKit API modules, frontend flows, and provider dependencies have been removed. Legacy database schema declarations remain registered so existing tables are preserved and Drizzle will not infer destructive drops.
@@ -138,7 +149,7 @@ Apps can expose whichever views suit their use cases—for example activity, ser
 
 - Which integration and user-facing dashboard view should be first?
 - Which OIDC group identifiers/claims does the deployed provider actually supply, and what exact group value should configure dashboard admins?
-- Are dashboard items shared across all users, scoped to OIDC groups, or a mixture?
+- For each app action, which operations are available to everyone in the friend group, only the author/owner, or only admins? Keep any exceptions explicit and enforced by the owning app.
 - What data should each integration retain, and what retention/deletion controls are expected?
 - Which app/platform actions and metadata belong in the audit log, what retention and integrity guarantees are needed, and how should sensitive data be excluded while ensuring only admins can read it?
-- Is local disk sufficient for media in the expected deployment, or is S3-compatible storage needed from the start?
+- If local media storage later becomes insufficient, what operational need justifies adding an S3-compatible storage adapter?

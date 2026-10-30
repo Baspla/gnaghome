@@ -6,11 +6,13 @@ import { createUserModule } from './platform/users';
 import { createLogger } from './lib/logger';
 import { createRealtimeModule } from './platform/realtime';
 import { createActivityFeedModule } from './platform/activity-feed/module';
+import { createFilesModule } from './platform/files/module';
 
 const logger = createLogger('app');
 
 type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser'>;
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
+type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 
 export type AppDependencies = {
     getSession: SessionResolver;
@@ -18,6 +20,7 @@ export type AppDependencies = {
     adminGroupName?: string;
     userService: UserServiceDependency;
     activityFeedService: ActivityFeedServiceDependency;
+    filesService: FilesServiceDependency;
     realtimeModule: typeof createRealtimeModule;
     generateRealtimeToken: (user: import('better-auth').User, deviceId: string) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
 };
@@ -67,6 +70,7 @@ export function createApp(dependencies: AppDependencies) {
                         .get('/status', () => ({ status: 'online' }))
                         .use(createUserModule(authMiddleware, dependencies.userService))
                         .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService))
+                        .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )
         );

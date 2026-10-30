@@ -9,6 +9,23 @@ describe('SQLite integration', () => {
             const tables = await db.all('SELECT name FROM sqlite_master WHERE type = \'table\'') as { name: string }[];
             expect(tables.map((table) => table.name)).toContain('user');
             expect(tables.map((table) => table.name)).toContain('activity_feed_item');
+            expect(tables.map((table) => table.name)).toContain('stored_file');
+            const fileColumns = await db.all('PRAGMA table_info(stored_file)') as { name: string }[];
+            expect(fileColumns.map((column) => column.name)).toEqual([
+                'id',
+                'storage_key',
+                'uploaded_by_user_id',
+                'mime_type',
+                'size',
+                'is_private',
+                'created_at',
+                'status',
+                'expires_at',
+            ]);
+            const fileForeignKeys = await db.all('PRAGMA foreign_key_list(stored_file)') as { table: string; from: string; on_delete: string }[];
+            expect(fileForeignKeys).toHaveLength(1);
+            expect(fileForeignKeys[0]).toMatchObject({ table: 'user', from: 'uploaded_by_user_id' });
+            expect(fileForeignKeys[0]?.on_delete.toLowerCase()).toBe('cascade');
             const activityColumns = await db.all('PRAGMA table_info(activity_feed_item)') as { name: string }[];
             expect(activityColumns.map((column) => column.name)).toEqual([
                 'id',

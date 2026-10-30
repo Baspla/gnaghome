@@ -42,3 +42,6 @@ package-lock.json
 **/*.bun
 
 .env
+
+# Locally stored uploaded files; production persists this path in the Docker data volume.
+/data/files/
