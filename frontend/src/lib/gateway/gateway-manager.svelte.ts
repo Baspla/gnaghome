@@ -77,7 +77,7 @@ export class GatewayManager {
                 logger.error("no user ID found");
                 return;
             }
-            this.subscribeToChannel("user:" + this.userId);
+            this.subscribeToChannel(`user:${this.userId}`);
             this.subscribeToChannel(RealtimeChannels.ACTIVITY_FEED);
             this.subscribeToChannel(RealtimeChannels.DISCUSSIONS);
             for (const handler of this.connectionHandlers) handler();

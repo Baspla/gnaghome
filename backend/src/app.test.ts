@@ -38,6 +38,12 @@ function makeTestApp() {
         discussionsFeedService: { getMessageCounts: async () => ({}) },
         canViewDiscussionTarget: async (viewerUserId, targetType, targetId) =>
             viewerUserId === 'user-1' && targetType === 'crewnow.post' && targetId === 'test-post-id',
+        notificationsService: {
+            getSettings: async () => ok({ topics: [], subscriptionsCount: 0 }),
+            setPreference: async () => ok(null),
+            saveSubscription: async () => ok(null),
+            removeSubscription: async () => ok(false),
+        },
         filesService: {
             uploadFile: async () => ok({} as never),
             getFile: async () => ok({} as never),
@@ -114,6 +120,20 @@ describe('backend HTTP app', () => {
         expect(await timelineResponse.json()).toEqual({ items: [], nextCursor: null });
         expect(usersResponse.status).toBe(200);
         expect(await usersResponse.json()).toEqual({ items: [] });
+    });
+
+    it('provides notification topics to signed-in users and requires authentication for settings', async () => {
+        const unauthorized = await makeTestApp().handle(new Request('http://localhost/api/v1/notifications/settings'));
+        expect(unauthorized.status).toBe(401);
+
+        session = { user: sessionUser, session: { id: 'session-1' } };
+        const response = await makeTestApp().handle(new Request('http://localhost/api/v1/notifications/settings'));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            topics: [],
+            subscriptionsCount: 0,
+            vapidPublicKey: null,
+        });
     });
 
     it('filters protected feed targets before returning activity items', async () => {

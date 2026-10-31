@@ -9,6 +9,7 @@ import { createActivityFeedModule } from './platform/activity-feed/module';
 import { createFilesModule } from './platform/files/module';
 import { createCrewNowModule } from './apps/crewnow/module';
 import { createDiscussionsModule } from './platform/discussions/module';
+import { createNotificationsModule } from './platform/notifications/module';
 
 const logger = createLogger('app');
 
@@ -19,6 +20,7 @@ type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowSer
 type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
 type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
+type NotificationsServiceDependency = Pick<import('./platform/notifications/service').NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription'>;
 
 export type AppDependencies = {
     getSession: SessionResolver;
@@ -31,6 +33,8 @@ export type AppDependencies = {
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
     canViewDiscussionTarget: DiscussionTargetAuthorizer;
+    notificationsService: NotificationsServiceDependency;
+    vapidPublicKey?: string;
     realtimeModule: typeof createRealtimeModule;
     generateRealtimeToken: (user: import('better-auth').User, deviceId: string) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
 };
@@ -81,6 +85,7 @@ export function createApp(dependencies: AppDependencies) {
                         .use(createUserModule(authMiddleware, dependencies.userService))
                         .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService))
                         .use(createDiscussionsModule(authMiddleware, dependencies.discussionsService, dependencies.canViewDiscussionTarget))
+                        .use(createNotificationsModule(authMiddleware, dependencies.notificationsService, dependencies.vapidPublicKey))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCrewNowModule(authMiddleware, dependencies.crewNowService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))

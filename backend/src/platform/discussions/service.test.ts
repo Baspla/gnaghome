@@ -9,6 +9,7 @@ describe('DiscussionsService', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
     let service: DiscussionsService;
     let broadcast: ReturnType<typeof mock>;
+    let notifications: { notifyUsers: ReturnType<typeof mock> };
     let discussionId: string;
 
     beforeEach(async () => {
@@ -16,9 +17,12 @@ describe('DiscussionsService', () => {
         await database.db.insert(user).values([
             { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
+            { id: 'user-3', name: 'Cara', email: 'cara@example.test' },
         ]);
         broadcast = mock(async () => ok(null));
-        service = new DiscussionsService(database.db, broadcast);
+        notifications = { notifyUsers: mock(async () => {}) };
+        service = new DiscussionsService(database.db, broadcast, notifications, async (_targetType, targetId) =>
+            targetId === 'post-1' ? 'user-1' : null);
         const createdDiscussion = await service.getOrCreateDiscussion('crewnow.post', 'post-1');
         expect(createdDiscussion.ok).toBe(true);
         if (!createdDiscussion.ok) throw new Error('discussion setup failed');
@@ -103,5 +107,30 @@ describe('DiscussionsService', () => {
             .toMatchObject({ ok: false, error: { status: 400 } });
         expect(broadcast).not.toHaveBeenCalled();
         expect(await database.db.select().from(discussionMessage)).toHaveLength(0);
+    });
+
+    it('notifies a post owner and prior discussion participants only for newly created messages', async () => {
+        await service.createMessage(discussionId, 'user-2', 'Erster Kommentar');
+        expect(notifications.notifyUsers).toHaveBeenCalledTimes(1);
+        expect(notifications.notifyUsers.mock.calls[0]?.[0]).toBe('discussions.post-comment');
+        expect(notifications.notifyUsers.mock.calls[0]?.[1]).toEqual(['user-1']);
+
+        const ownerReply = await service.createMessage(discussionId, 'user-1', 'Antwort des Autors');
+        expect(ownerReply.ok).toBe(true);
+        expect(notifications.notifyUsers).toHaveBeenCalledTimes(2);
+        expect(notifications.notifyUsers.mock.calls[1]?.[0]).toBe('discussions.new-message');
+        expect(notifications.notifyUsers.mock.calls[1]?.[1]).toEqual(['user-2']);
+
+        const participantReply = await service.createMessage(discussionId, 'user-3', 'Noch ein Kommentar');
+        expect(participantReply.ok).toBe(true);
+        expect(notifications.notifyUsers).toHaveBeenCalledTimes(4);
+        expect(notifications.notifyUsers.mock.calls[2]?.[0]).toBe('discussions.post-comment');
+        expect(notifications.notifyUsers.mock.calls[3]?.[0]).toBe('discussions.new-message');
+        expect(notifications.notifyUsers.mock.calls[3]?.[1]).toEqual(['user-2']);
+
+        if (participantReply.ok) {
+            await service.editMessage(participantReply.value.id, 'user-3', 'Bearbeitet');
+        }
+        expect(notifications.notifyUsers).toHaveBeenCalledTimes(4);
     });
 });

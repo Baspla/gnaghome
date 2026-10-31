@@ -43,6 +43,15 @@ describe('TasksService', () => {
         ]);
     });
 
+    it('supports stable caller-supplied task IDs for idempotent scheduled work', async () => {
+        const first = await service.enqueueTask('test.collect', { value: 'once' }, { id: 'stable-delivery-id', runAt: new Date('2026-01-01T10:00:00.000Z') });
+        const retry = await service.enqueueTask('test.collect', { value: 'duplicate' }, { id: 'stable-delivery-id', runAt: new Date('2026-01-01T10:00:00.000Z') });
+
+        expect(first).toMatchObject({ ok: true, value: { id: 'stable-delivery-id', payload: '{"value":"once"}' } });
+        expect(retry).toMatchObject({ ok: true, value: { id: 'stable-delivery-id', payload: '{"value":"once"}' } });
+        expect(await database.db.select().from(task).where(eq(task.id, 'stable-delivery-id'))).toHaveLength(1);
+    });
+
     it('retries a failed worker up to the configured attempt limit and retains the error', async () => {
         let attempts = 0;
         service.registerWorker('test.collect', async () => { attempts++; throw new Error('temporarily unavailable'); });

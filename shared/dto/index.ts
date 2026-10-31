@@ -5,5 +5,7 @@ export type {
     ActivityFeedChangedPayload,
     DiscussionChangedEvent,
     DiscussionChangedPayload,
+    NotificationSettingsChangedEvent,
+    NotificationSettingsChangedPayload,
     PlatformEvent,
 } from './platform-event';

@@ -7,12 +7,15 @@
     import Sun from "@lucide/svelte/icons/sun";
     import Moon from "@lucide/svelte/icons/moon";
     import Monitor from "@lucide/svelte/icons/monitor";
+    import Bell from "@lucide/svelte/icons/bell";
+    import NotificationSettings from "./NotificationSettings.svelte";
 
     const user = $derived(page.data.user ?? null);
-    type SettingsSection = "profile" | "appearance";
+    type SettingsSection = "profile" | "appearance" | "notifications";
     const sections: { id: SettingsSection; label: string; icon: typeof UserRound }[] = [
-        { id: "profile", label: "Profile", icon: UserRound },
-        { id: "appearance", label: "Appearance", icon: Palette },
+        { id: "profile", label: "Profil", icon: UserRound },
+        { id: "appearance", label: "Darstellung", icon: Palette },
+        { id: "notifications", label: "Benachrichtigungen", icon: Bell },
     ];
     let activeSection = $state<SettingsSection>("profile");
 
@@ -42,19 +45,19 @@
         {#if activeSection === "profile"}
             <div class="flex flex-col gap-6">
                 <div class="flex items-center gap-4">
-                    <img src={user?.image ?? "/default-avatar.png"} alt="User avatar" class="h-16 w-16 rounded-full border-2 border-surface-200-800" />
+                    <img src={user?.image ?? "/default-avatar.png"} alt="Profilbild" class="h-16 w-16 rounded-full border-2 border-surface-200-800" />
                     <div>
-                        <p class="font-bold">{user?.name ?? "User"}</p>
+                        <p class="font-bold">{user?.name ?? "Benutzer"}</p>
                         <p class="text-sm text-surface-contrast-400-800">{user?.email}</p>
                     </div>
                 </div>
-                <button type="button" class="btn preset-outlined-error" onclick={logout}>Log out</button>
+                <button type="button" class="btn preset-outlined-error" onclick={logout}>Abmelden</button>
             </div>
-        {:else}
+        {:else if activeSection === "appearance"}
             <div class="flex flex-col gap-6">
                 <div>
-                    <p class="font-semibold">Color mode</p>
-                    <p class="text-sm text-surface-contrast-400-800">Choose light, dark, or system mode.</p>
+                    <p class="font-semibold">Erscheinungsmodus</p>
+                    <p class="text-sm text-surface-contrast-400-800">Helles, dunkles oder systemabhängiges Erscheinungsbild auswählen.</p>
                     <div class="mt-2 grid grid-cols-3 gap-1 rounded-md bg-surface-100-900 p-1">
                         {#each THEME_MODES as modeOption (modeOption.id)}
                             <button
@@ -70,8 +73,8 @@
                 </div>
 
                 <div>
-                    <p class="font-semibold">Color theme</p>
-                    <p class="text-sm text-surface-contrast-400-800">Choose the application color theme.</p>
+                    <p class="font-semibold">Farbschema</p>
+                    <p class="text-sm text-surface-contrast-400-800">Farbschema der Anwendung auswählen.</p>
                     <div class="mt-2 grid grid-cols-3 gap-2">
                         {#each THEMES as themeOption (themeOption.id)}
                             <button
@@ -90,6 +93,8 @@
                     </div>
                 </div>
             </div>
+        {:else}
+            <NotificationSettings />
         {/if}
     </div>
 </div>

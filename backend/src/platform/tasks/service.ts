@@ -93,24 +93,26 @@ export class TasksService<Payloads extends TaskPayloadMap = TaskPayloadMap> {
     async enqueueTask<TType extends TaskName<Payloads>>(
         taskType: TType,
         payload: TaskPayload<Payloads, TType>,
-        options: { maxAttempts?: number } = {},
+        options: { maxAttempts?: number; id?: string; runAt?: Date } = {},
     ): Promise<Result<TaskRecord, BadRequestError | InternalError>> {
         const serialized = serializePayload(payload);
         const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
         if (!validIdentifier(taskType) || serialized === null
+            || (options.id !== undefined && !validIdentifier(options.id))
+            || (options.runAt !== undefined && (!(options.runAt instanceof Date) || !Number.isFinite(options.runAt.getTime())))
             || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > MAX_ALLOWED_ATTEMPTS) {
             return err({ status: 400, code: 'BAD_REQUEST', message: 'Invalid task type, payload, or retry limit' });
         }
 
         const now = this.clock();
         const record: TaskRecord = {
-            id: randomUUID(),
+            id: options.id ?? randomUUID(),
             taskType,
             payload: serialized,
             status: 'queued',
             attempts: 0,
             maxAttempts,
-            runAt: now,
+            runAt: options.runAt ?? now,
             startedAt: null,
             finishedAt: null,
             lastError: null,
@@ -121,8 +123,10 @@ export class TasksService<Payloads extends TaskPayloadMap = TaskPayloadMap> {
         };
 
         try {
-            const [created] = await this.db.insert(task).values(record).returning();
-            return ok(created ?? record);
+            const [created] = await this.db.insert(task).values(record).onConflictDoNothing({ target: task.id }).returning();
+            if (created) return ok(created);
+            const [existing] = await this.db.select().from(task).where(eq(task.id, record.id)).limit(1);
+            return existing ? ok(existing) : ok(record);
         } catch (error) {
             logger.error('failed to enqueue task', { taskType, error: String(error) });
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Failed to enqueue task' });

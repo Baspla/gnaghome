@@ -11,6 +11,8 @@ import {
 import { createLogger } from './lib/logger';
 import { env } from './env';
 import { warnIfUsingInMemoryDatabase } from './db/persistence-warning';
+import { NOTIFICATION_TOPICS } from './platform/notifications/catalog';
+import { registerDailyCrewNowReminder, setupDailyCrewNowReminder } from './platform/notifications/reminder';
 
 const logger = createLogger('app');
 warnIfUsingInMemoryDatabase(env.DATABASE_URL, process.env.NODE_ENV);
@@ -18,7 +20,11 @@ const database = await createDatabase(env.DATABASE_URL, `${import.meta.dir}/../d
 const broadcast = createBroadcastPublisher(
     createCentrifugoPublisher(env.CENTRIFUGO_URL, env.CENTRIFUGO_API_KEY),
 );
-const services = createServices(database.db, broadcast, env.FILES_DIRECTORY);
+const services = createServices(database.db, broadcast, env.FILES_DIRECTORY, {
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+    subject: env.VAPID_SUBJECT,
+});
 const {
     users: userService,
     activityFeed: activityFeedService,
@@ -26,7 +32,12 @@ const {
     files: filesService,
     crewnow: crewNowService,
     tasks: tasksService,
+    notifications: notificationsService,
 } = services;
+const registeredTopics = await notificationsService.registerTopics(NOTIFICATION_TOPICS);
+if (!registeredTopics.ok) logger.error('notification topics failed to register', { error: registeredTopics.error.message });
+registerDailyCrewNowReminder(tasksService, database.db, notificationsService);
+await setupDailyCrewNowReminder(tasksService);
 const initialFileCleanup = filesService.cleanupExpiredUploads();
 void initialFileCleanup.then((result) => {
     if (result.ok) {
@@ -59,6 +70,8 @@ const app = createApp({
         if (targetType !== 'crewnow.post') return false;
         return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
     },
+    notificationsService,
+    vapidPublicKey: env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY ? env.VAPID_PUBLIC_KEY : undefined,
     filesService,
     crewNowService,
     realtimeModule: createRealtimeModule,

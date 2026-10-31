@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { err, ok, type BadRequestError, type ForbiddenError, type InternalError, type NotFoundError, type Result } from '../../lib/result';
 import { RealtimeChannels } from '$shared/constants';
@@ -7,6 +7,7 @@ import type { DiscussionChangedEvent, ActivityFeedChangedEvent } from '$shared/d
 import type { BroadcastPublisher } from '../realtime/service';
 import { discussion, discussionMessage, type DiscussionMessage } from './schema';
 import { user } from '../users/schema';
+import type { NotificationsService } from '../notifications/service';
 
 const MAX_MESSAGE_LENGTH = 5000;
 
@@ -26,7 +27,13 @@ export class DiscussionsService {
     constructor(
         private readonly db: AppDatabase,
         private readonly broadcast: BroadcastPublisher,
+        private readonly notifications: Pick<NotificationsService, 'notifyUsers'> = { notifyUsers: async () => {} },
+        private getTargetOwner: (targetType: string, targetId: string) => Promise<string | null> = async () => null,
     ) {}
+
+    setTargetOwnerResolver(resolver: (targetType: string, targetId: string) => Promise<string | null>): void {
+        this.getTargetOwner = resolver;
+    }
 
     async getOrCreateDiscussion(targetType: string, targetId: string): Promise<Result<typeof discussion.$inferSelect, BadRequestError | InternalError>> {
         if (!validReference(targetType) || !validReference(targetId)) {
@@ -150,10 +157,47 @@ export class DiscussionsService {
                 id: randomUUID(), discussionId, authorUserId, body: normalizedBody,
             }).returning();
             if (!row) return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
+            await this.notifyNewMessage(discussionResult.value, authorUserId);
             await this.publishChanged(discussionId);
             return ok({ ...row, author, canEdit: true });
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
+        }
+    }
+
+    private async notifyNewMessage(target: typeof discussion.$inferSelect, authorUserId: string): Promise<void> {
+        try {
+            const postAuthorId = target.targetType === 'crewnow.post'
+                ? await this.getTargetOwner(target.targetType, target.targetId)
+                : null;
+
+            const previousAuthors = await this.db.select({ userId: discussionMessage.authorUserId })
+                .from(discussionMessage).where(and(
+                    eq(discussionMessage.discussionId, target.id),
+                    ne(discussionMessage.authorUserId, authorUserId),
+                ));
+            const recipients = new Set(previousAuthors.map((row) => row.userId));
+
+            if (target.targetType === 'crewnow.post') {
+                if (postAuthorId && postAuthorId !== authorUserId) {
+                    await this.notifications.notifyUsers('discussions.post-comment', [postAuthorId], {
+                        title: 'Neuer Kommentar zu deinem CrewNow',
+                        body: 'Jemand hat deinen CrewNow kommentiert.',
+                        url: `/crewnow/posts/${encodeURIComponent(target.targetId)}`,
+                    });
+                }
+            }
+
+            if (postAuthorId) recipients.delete(postAuthorId);
+            if (recipients.size > 0) {
+                await this.notifications.notifyUsers('discussions.new-message', [...recipients], {
+                    title: 'Neue Nachricht in einer Diskussion',
+                    body: 'In einer Diskussion, an der du teilnimmst, gibt es eine neue Nachricht.',
+                    url: target.targetType === 'crewnow.post' ? `/crewnow/posts/${encodeURIComponent(target.targetId)}` : '/',
+                });
+            }
+        } catch {
+            // Notification delivery is best-effort and cannot fail a persisted discussion message.
         }
     }
 
