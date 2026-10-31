@@ -20,6 +20,12 @@ export function isPlatformEvent(value: unknown): value is PlatformEvent {
                 && !Array.isArray(event.data)
                 && Object.keys(event.data).length === 0;
         }
+        case 'notification-settings.changed': {
+            return typeof event.data === 'object'
+                && event.data !== null
+                && !Array.isArray(event.data)
+                && Object.keys(event.data).length === 0;
+        }
         default:
             return false;
     }

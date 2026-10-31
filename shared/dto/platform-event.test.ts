@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
-import { PlatformEventSchema, type ActivityFeedChangedEvent, type DiscussionChangedEvent, type PlatformEvent } from './platform-event';
+import { PlatformEventSchema, type ActivityFeedChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
 import { isPlatformEvent } from './platform-event-validation';
 
 const app = new Elysia()
@@ -60,5 +60,17 @@ describe('PlatformEventSchema', () => {
         expect(isPlatformEvent({ ...event, data: { discussionId: 'private-id' } })).toBe(false);
         expect(isPlatformEvent({ ...event, data: { body: 'private' } })).toBe(false);
         expect(isPlatformEvent({ ...event, type: 'discussion.deleted' })).toBe(false);
+    });
+
+    it('accepts notification-settings invalidations without private settings data', () => {
+        const event: NotificationSettingsChangedEvent = {
+            id: 'event-notifications-1',
+            occurredAt: '2026-10-28T12:00:00.000Z',
+            type: 'notification-settings.changed',
+            data: {},
+        };
+        expect(isPlatformEvent(event)).toBe(true);
+        expect(isPlatformEvent({ ...event, data: { endpoint: 'https://secret.example' } })).toBe(false);
+        expect(isPlatformEvent({ ...event, type: 'notification-settings.updated' })).toBe(false);
     });
 });

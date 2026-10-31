@@ -36,6 +36,9 @@ export const env = {
     CENTRIFUGO_URL: readEnv('GNAGHOME_CENTRIFUGO_URL') ?? 'http://localhost:8000',
     CENTRIFUGO_SECRET: readEnv('GNAGHOME_CENTRIFUGO_JWT_SECRET') ?? 'default_secret',
     CENTRIFUGO_API_KEY: readEnv('GNAGHOME_CENTRIFUGO_API_KEY') ?? 'default_http_api_key',
+    VAPID_PUBLIC_KEY: readEnv('GNAGHOME_VAPID_PUBLIC_KEY'),
+    VAPID_PRIVATE_KEY: readEnv('GNAGHOME_VAPID_PRIVATE_KEY'),
+    VAPID_SUBJECT: readEnv('GNAGHOME_VAPID_SUBJECT') ?? 'mailto:admin@example.com',
     LOG_LEVEL: readEnv('GNAGHOME_LOG_LEVEL') ?? 'info',
     BETTER_AUTH_LOG_LEVEL: readEnv('GNAGHOME_BETTER_AUTH_LOG_LEVEL') ?? 'info',
 };

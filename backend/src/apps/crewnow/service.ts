@@ -16,6 +16,7 @@ import type { FilesService } from '../../platform/files/service';
 import { user } from '../../platform/users/schema';
 import { crewNowPost, crewNowPostTag, type CrewNowPost } from './schema';
 import type { DiscussionsService } from '../../platform/discussions/service';
+import type { NotificationsService } from '../../platform/notifications/service';
 
 export type CrewNowUserSummary = { id: string; name: string; image: string | null };
 
@@ -69,6 +70,10 @@ export class CrewNowService {
         private readonly files: Pick<FilesService, 'getFile' | 'getOwnedPendingUpload' | 'finalizeUpload' | 'deleteFile' | 'discardPendingUpload'>,
         private readonly activityFeed: Pick<ActivityFeedService, 'recordActivity' | 'invalidateFeed'>,
         private readonly discussions: Pick<DiscussionsService, 'getOrCreateDiscussion' | 'deleteDiscussion' | 'getMessageCounts'>,
+        private readonly notifications: Pick<NotificationsService, 'notifyAll' | 'notifyUsers'> = {
+            notifyAll: async () => {},
+            notifyUsers: async () => {},
+        },
     ) {}
 
     private async getTaggedUsers(postId: string): Promise<CrewNowUserSummary[]> {
@@ -247,6 +252,16 @@ export class CrewNowService {
                 occurredAt: post.createdAt,
             });
             if (!recorded.ok) return err(recorded.error);
+            await this.notifications.notifyAll('crewnow.post.new', [authorUserId, ...input.taggedUserIds], {
+                title: 'Neuer CrewNow',
+                body: 'Ein neuer CrewNow wurde geteilt.',
+                url: `/crewnow/posts/${encodeURIComponent(post.id)}`,
+            });
+            await this.notifications.notifyUsers('crewnow.post.tagged', input.taggedUserIds, {
+                title: 'Du wurdest markiert',
+                body: 'Du wurdest in einem neuen CrewNow markiert.',
+                url: `/crewnow/posts/${encodeURIComponent(post.id)}`,
+            });
             const summary = await this.resolvePost(post, authorUserId);
             if (!summary) return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Post konnte nicht geladen werden.' });
             return ok({ ...summary, created: true });
@@ -382,6 +397,16 @@ export class CrewNowService {
 
     async getPostForActivity(viewerUserId: string, postId: string): Promise<Result<CrewNowPostSummary, NotFoundError | InternalError>> {
         return this.getPost(viewerUserId, postId);
+    }
+
+    async getPostOwnerUserId(postId: string): Promise<string | null> {
+        try {
+            const [row] = await this.db.select({ userId: crewNowPost.authorUserId })
+                .from(crewNowPost).where(eq(crewNowPost.id, postId)).limit(1);
+            return row?.userId ?? null;
+        } catch {
+            return null;
+        }
     }
 
     async getActivityTaggedUsers(_viewerUserId: string, ids: string[]): Promise<CrewNowUserSummary[]> {

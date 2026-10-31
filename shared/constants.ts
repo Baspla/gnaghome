@@ -5,6 +5,7 @@ export const Modules = {
     ACTIVITY_FEED: 'activity-feed',
     DISCUSSIONS: 'discussions',
     FILES: 'files',
+    NOTIFICATIONS: 'notifications',
 } as const;
 
 export const RealtimeChannels = {

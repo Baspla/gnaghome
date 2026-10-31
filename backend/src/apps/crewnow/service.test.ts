@@ -23,6 +23,8 @@ describe('CrewNowService', () => {
     let service: CrewNowService;
     let recordActivity: ReturnType<typeof mock>;
     let invalidateFeed: ReturnType<typeof mock>;
+    let notifyAll: ReturnType<typeof mock>;
+    let notifyUsers: ReturnType<typeof mock>;
     let discussions: DiscussionsService;
 
     async function uploadImage(userId = 'user-1') {
@@ -39,7 +41,9 @@ describe('CrewNowService', () => {
         invalidateFeed = mock(async () => {});
         const activityFeed = { recordActivity, invalidateFeed } as unknown as ActivityFeedService;
         discussions = new DiscussionsService(database.db, async () => ok(null));
-        service = new CrewNowService(database.db, files, activityFeed, discussions);
+        notifyAll = mock(async () => {});
+        notifyUsers = mock(async () => {});
+        service = new CrewNowService(database.db, files, activityFeed, discussions, { notifyAll, notifyUsers });
         await database.db.insert(user).values([
             { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
@@ -89,6 +93,12 @@ describe('CrewNowService', () => {
             expect(await discussions.getDiscussion(createdPost.discussionId)).toMatchObject({ ok: true, value: { targetType: 'crewnow.post', targetId: 'post-1' } });
         }
         expect(invalidateFeed).not.toHaveBeenCalled();
+        expect(notifyAll).toHaveBeenCalledWith('crewnow.post.new', ['user-1', 'user-2', 'user-3'], expect.objectContaining({
+            url: '/crewnow/posts/post-1',
+        }));
+        expect(notifyUsers).toHaveBeenCalledWith('crewnow.post.tagged', ['user-2', 'user-3'], expect.objectContaining({
+            url: '/crewnow/posts/post-1',
+        }));
         expect((await files.getFile(backImageFileId, 'user-2')).ok).toBe(true);
         expect((await files.getFile(frontImageFileId, 'user-2')).ok).toBe(true);
     });
@@ -131,6 +141,8 @@ describe('CrewNowService', () => {
         expect(first.ok).toBe(true);
         expect(retry).toMatchObject({ ok: true, value: { id: 'post-retry', created: false } });
         expect(recordActivity).toHaveBeenCalledTimes(2);
+        expect(notifyAll).toHaveBeenCalledTimes(1);
+        expect(notifyUsers).toHaveBeenCalledTimes(1);
     });
 
     it('does not let a different post attach images that are already attached to another post', async () => {
@@ -187,6 +199,8 @@ describe('CrewNowService', () => {
         });
         expect(recordActivity).toHaveBeenCalledTimes(1);
         expect(invalidateFeed).toHaveBeenCalledTimes(1);
+        expect(notifyAll).toHaveBeenCalledTimes(1);
+        expect(notifyUsers).toHaveBeenCalledTimes(1);
     });
 
     it('returns a chronological cursor-paginated timeline and a post by ID to any signed-in viewer', async () => {

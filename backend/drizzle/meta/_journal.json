@@ -43,6 +43,13 @@
       "when": 1793483278190,
       "tag": "0005_panoramic_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793485730552,
+      "tag": "0006_moaning_shaman",
+      "breakpoints": true
     }
   ]
 }

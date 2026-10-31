@@ -24,10 +24,23 @@ export const DiscussionChangedEventSchema = t.Object({
 });
 export type DiscussionChangedEvent = typeof DiscussionChangedEventSchema.static;
 
+/** Content-free invalidation for the signed-in user's notification settings. */
+export const NotificationSettingsChangedPayloadSchema = t.Object({});
+export type NotificationSettingsChangedPayload = typeof NotificationSettingsChangedPayloadSchema.static;
+
+export const NotificationSettingsChangedEventSchema = t.Object({
+    id: t.String(),
+    occurredAt: t.String(),
+    type: t.Literal('notification-settings.changed'),
+    data: NotificationSettingsChangedPayloadSchema,
+});
+export type NotificationSettingsChangedEvent = typeof NotificationSettingsChangedEventSchema.static;
+
 /** Discriminated union of all platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
     DiscussionChangedEventSchema,
+    NotificationSettingsChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;

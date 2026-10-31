@@ -12,7 +12,7 @@
 <DropdownMenu.Root>
     <DropdownMenu.Trigger
         class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full outline-none transition hover:bg-surface-200-800 focus-visible:ring-2 focus-visible:ring-primary-500"
-        aria-label={`Open account menu for ${user?.name ?? "User"}`}
+        aria-label={`Kontomenü für ${user?.name ?? "Benutzer"} öffnen`}
         title={user?.name ?? "User"}
     >
         <img src={user?.image ?? "/default-avatar.png"} alt="" class="h-9 w-9 rounded-full object-cover" />
@@ -36,14 +36,14 @@
                 onSelect={() => settingsOpen = true}
             >
                 <Settings class="h-4 w-4" />
-                Settings
+                Einstellungen
             </DropdownMenu.Item>
         </DropdownMenu.Content>
     </DropdownMenu.Portal>
 </DropdownMenu.Root>
 
 <CustomDialog bind:open={settingsOpen} contentProps={{ interactOutsideBehavior: "close" }}>
-    {#snippet title()}<p>User settings</p>{/snippet}
-    {#snippet description()}<p>Manage your profile and appearance.</p>{/snippet}
+    {#snippet title()}<p>Einstellungen</p>{/snippet}
+    {#snippet description()}<p>Profil, Darstellung und Benachrichtigungen verwalten.</p>{/snippet}
     <UserSettingsView />
 </CustomDialog>
