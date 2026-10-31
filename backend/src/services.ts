@@ -5,13 +5,15 @@ import { FilesService, LocalFileStorage } from './platform/files';
 import type { BroadcastPublisher } from './platform/realtime/service';
 import { CrewNowService } from './apps/crewnow/service';
 import { DiscussionsService } from './platform/discussions/service';
+import { TasksService } from './platform/tasks';
 
 export function createServices(db: AppDatabase, broadcast: BroadcastPublisher, filesDirectory = 'data/files') {
     const users = new UserService(db);
     const activityFeed = new ActivityFeedService(db, broadcast);
     const discussions = new DiscussionsService(db, broadcast);
+    const tasks = new TasksService(db);
     const files = new FilesService(db, new LocalFileStorage(filesDirectory));
     const crewnow = new CrewNowService(db, files, activityFeed, discussions);
 
-    return { users, activityFeed, discussions, files, crewnow };
+    return { users, activityFeed, discussions, files, crewnow, tasks };
 }

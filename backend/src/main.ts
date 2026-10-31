@@ -25,6 +25,7 @@ const {
     discussions: discussionsService,
     files: filesService,
     crewnow: crewNowService,
+    tasks: tasksService,
 } = services;
 const initialFileCleanup = filesService.cleanupExpiredUploads();
 void initialFileCleanup.then((result) => {
@@ -38,6 +39,12 @@ const fileCleanupTimer = setInterval(() => {
     void filesService.cleanupExpiredUploads();
 }, 60 * 60 * 1000);
 fileCleanupTimer.unref();
+const taskRunnerStart = await tasksService.start();
+if (!taskRunnerStart.ok) {
+    logger.error('task runner failed to start', { error: taskRunnerStart.error.message });
+} else {
+    logger.info('task runner started');
+}
 const auth = createAuth(database.db, userService);
 
 const app = createApp({
@@ -65,6 +72,7 @@ const shutdown = async (signal: string) => {
     shuttingDown = true;
     logger.info('shutdown signal received', { signal });
     clearInterval(fileCleanupTimer);
+    await tasksService.stop();
     database.close();
     process.exit(0);
 };

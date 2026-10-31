@@ -36,6 +36,13 @@
       "when": 1793400877824,
       "tag": "0004_daffy_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793483278190,
+      "tag": "0005_panoramic_chameleon",
+      "breakpoints": true
     }
   ]
 }

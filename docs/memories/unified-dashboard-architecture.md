@@ -34,7 +34,7 @@ Retiring a feature does not imply immediately dropping its database tables. Pres
 - A durable audit log of changes across apps and platform systems, including create/update/delete actions. This is separate from social feed and provider activity; only admins may read audit records, with authorization enforced by the backend.
 - Durable normalized activity collected from external services for consumers such as Stats; this is distinct from app-generated feed events.
 - Notifications, comments and reactions on supported dashboard items, and shared Files capability for uploads. When an object appears in the feed and on its app page, both views use the same canonical comments and reactions rather than separate copies.
-- A persistent background-job mechanism for provider polling/sync, retries, and related asynchronous work. Image upload is currently synchronous; adding image processing remains future work.
+- A persistent background-task mechanism for provider polling/sync, retries, and related asynchronous work. Image upload is currently synchronous; adding image processing remains future work.
 
 ### Shared Files capability
 
@@ -78,6 +78,10 @@ Each provider integration owns its API calls, credential handling, rate limits, 
 Model externally collected activity with a small common envelope (for example: actor, source/provider, event type, occurred-at time, and a reference or validated payload for provider-specific details). Keep provider-specific information available without forcing unrelated services into a single oversized schema. A user-defined arbitrary collection system is not a prerequisite; introduce it only when a concrete use case establishes its ownership, validation, and access rules. For app-generated feed items, preserve a stable reference to the originating object so feed and object-page views can resolve the same object and its shared comments/reactions under the owning app's authorization rules.
 
 Use a job queue for work to perform (for example, “sync Steam activity”), and activity records for the results (for example, “Steam reported this user started a game”). Start with persistence appropriate to the existing SQLite deployment and a worker alongside the backend; do not add separate queue infrastructure before workload justifies it. Jobs should be retryable, safe to rerun, and respectful of provider rate limits.
+
+### Current task system
+
+`backend/src/platform/tasks` implements a small internal-only task service backed by SQLite. Other backend modules can register typed task handlers, enqueue JSON-object payloads, and create or pause recurring schedules using five-field UTC cron syntax. The backend process runs one task at a time, retries failures up to a bounded attempt count, and recovers interrupted work after restart. Delivery is at-least-once: handlers should be safe to repeat if a process stops after performing side effects but before marking a task complete. Recurring schedules enqueue at most one overdue occurrence after downtime and then advance to the next future cron time. `TasksService.getTaskState()` exposes task and schedule status metadata for future admin use, omitting payloads. Startup recovery assumes one backend task runner per database. There are no task HTTP endpoints or UI.
 
 ## Module-owned authorization and OIDC groups
 
