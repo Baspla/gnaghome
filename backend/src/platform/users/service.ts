@@ -1,11 +1,23 @@
 import type { AppDatabase } from '../../db/connection'
 import type { RedactedUser, User } from '../../db/schema'
 import { user } from '../../db/schema'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { ok, err, type Result, type NotFoundError, type InternalError } from '../../lib/result'
 
 export class UserService {
     constructor(private readonly db: AppDatabase) {}
+
+    async listUsers() {
+        return await this.db
+            .select({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                image: user.image,
+            })
+            .from(user)
+            .orderBy(asc(user.name), asc(user.id));
+    }
 
     async getUserById (id: string) : Promise<Result<User, NotFoundError>> {
         const [userData] = await this.db

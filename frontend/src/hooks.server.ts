@@ -1,6 +1,7 @@
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { getConfiguredLevel } from '$lib/logger';
+import { fetchCurrentUserAdminStatus } from '$lib/server/admin-status';
 
 type SessionResponse = {
 	session?: App.Locals['session'];
@@ -25,7 +26,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			const session = (await response.json()) as SessionResponse | null;
 			if (session?.session && session.user) {
 				event.locals.session = session.session;
-				event.locals.user = session.user;
+				const apiBaseUrl = env.GNAGHOME_API_URL_INTERNAL ?? 'http://localhost:3000/api';
+				const isAdmin = await fetchCurrentUserAdminStatus(
+					event.fetch,
+					apiBaseUrl,
+					event.request.headers.get('cookie') ?? '',
+					session.user.id,
+				);
+				event.locals.user = { ...session.user, isAdmin };
 			}
 		}
 	} catch (error) {

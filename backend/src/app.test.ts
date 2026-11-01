@@ -32,7 +32,10 @@ function makeTestApp() {
         getSession: async () => session,
         authHandler: async () => new Response('test auth handler'),
         adminGroupName: 'admins',
-        userService: { getUserAsUser },
+        userService: {
+            getUserAsUser,
+            listUsers: async () => [],
+        },
         activityFeedService: { getFeed: getActivityFeed },
         discussionsService: {} as AppDependencies['discussionsService'],
         discussionsFeedService: { getMessageCounts: async () => ({}) },

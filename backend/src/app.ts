@@ -13,7 +13,7 @@ import { createNotificationsModule } from './platform/notifications/module';
 
 const logger = createLogger('app');
 
-type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser'>;
+type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser' | 'listUsers'>;
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;

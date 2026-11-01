@@ -43,4 +43,43 @@ describe('UserService', () => {
             error: { status: 404, code: 'NOT_FOUND', message: 'User not found' },
         });
     });
+
+    it('lists users with only the fields needed by the admin user view', async () => {
+        const createdAt = new Date('2025-12-31T23:00:00.000Z');
+        await database.db.insert(user).values([
+            {
+                id: 'user-1',
+                name: 'Alice',
+                email: 'alice@example.test',
+                image: 'https://example.test/alice.png',
+                createdAt,
+                groups: '["admins"]',
+            },
+            {
+                id: 'user-2',
+                name: 'Bob',
+                email: 'bob@example.test',
+                image: null,
+                createdAt,
+            },
+        ]);
+
+        const users = await service.listUsers();
+
+        expect(users).toHaveLength(2);
+        expect(users).toContainEqual({
+            id: 'user-1',
+            name: 'Alice',
+            email: 'alice@example.test',
+            image: 'https://example.test/alice.png',
+        });
+        expect(users).toContainEqual({
+            id: 'user-2',
+            name: 'Bob',
+            email: 'bob@example.test',
+            image: null,
+        });
+        expect(users[0]).not.toHaveProperty('groups');
+        expect(users[0]).not.toHaveProperty('emailVerified');
+    });
 });
