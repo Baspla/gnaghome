@@ -20,7 +20,7 @@ type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowSer
 type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
 type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
-type NotificationsServiceDependency = Pick<import('./platform/notifications/service').NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription'>;
+type NotificationsServiceDependency = Pick<import('./platform/notifications/service').NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription' | 'removeAllSubscriptions'>;
 
 export type AppDependencies = {
     getSession: SessionResolver;

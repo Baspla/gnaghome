@@ -69,5 +69,26 @@ describe('notifications HTTP module', () => {
             body: JSON.stringify({ enabled: true }),
         }));
         expect(response.status).toBe(401);
+
+        const removeAllResponse = await app().handle(new Request('http://localhost/notifications/subscriptions/all', {
+            method: 'DELETE',
+        }));
+        expect(removeAllResponse.status).toBe(401);
+    });
+
+    it('removes all push subscriptions for the authenticated user', async () => {
+        await service.saveSubscription('user-1', {
+            endpoint: 'https://fcm.googleapis.com/user-one-device',
+            keys: { p256dh: 'public-key-one', auth: 'auth-secret-one' },
+        });
+
+        const response = await app().handle(new Request('http://localhost/notifications/subscriptions/all', {
+            method: 'DELETE',
+        }));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ success: true, removed: 1 });
+        const settings = await service.getSettings('user-1');
+        expect(settings.ok && settings.value.subscriptionsCount).toBe(0);
     });
 });

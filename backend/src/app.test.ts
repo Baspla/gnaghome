@@ -43,6 +43,7 @@ function makeTestApp() {
             setPreference: async () => ok(null),
             saveSubscription: async () => ok(null),
             removeSubscription: async () => ok(false),
+            removeAllSubscriptions: async () => ok(0),
         },
         filesService: {
             uploadFile: async () => ok({} as never),
