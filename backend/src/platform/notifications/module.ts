@@ -3,7 +3,7 @@ import { Modules } from '$shared/constants';
 import type { createAuthMiddleware } from '../auth';
 import type { BrowserPushSubscription, NotificationsService } from './service';
 
-type Service = Pick<NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription'>;
+type Service = Pick<NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription' | 'removeAllSubscriptions'>;
 
 export function createNotificationsModule(
     authMiddleware: ReturnType<typeof createAuthMiddleware>,
@@ -37,6 +37,11 @@ export function createNotificationsModule(
             }),
             auth: true,
         })
+        .delete('/subscriptions/all', async ({ user, status }) => {
+            const result = await service.removeAllSubscriptions(user.id);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return { success: true, removed: result.value };
+        }, { auth: true })
         .delete('/subscriptions', async ({ user, body, status }) => {
             const result = await service.removeSubscription(user.id, body.endpoint);
             if (!result.ok) return status(result.error.status, { error: result.error });

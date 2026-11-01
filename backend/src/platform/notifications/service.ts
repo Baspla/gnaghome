@@ -202,6 +202,19 @@ export class NotificationsService {
         }
     }
 
+    async removeAllSubscriptions(userId: string): Promise<Result<number, InternalError>> {
+        try {
+            const removed = await this.db.delete(pushSubscription)
+                .where(eq(pushSubscription.userId, userId))
+                .returning({ id: pushSubscription.id });
+            if (removed.length > 0) await this.publishSettingsChanged(userId);
+            return ok(removed.length);
+        } catch (error) {
+            logger.error('failed to remove all browser push subscriptions', { error: String(error) });
+            return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Push subscriptions could not be removed' });
+        }
+    }
+
     async notifyUsers(topicId: string, userIds: readonly string[], payload: PushPayload): Promise<void> {
         if (userIds.length === 0 || !validPushPayload(payload)) return;
         try {

@@ -3,6 +3,7 @@
     import { Label, Switch } from 'bits-ui';
     import { api } from '$lib/api';
     import Button from '$lib/components/Button.svelte';
+    import AlertDialog from '$lib/components/customdialog/AlertDialog.svelte';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
 
     type Topic = {
@@ -22,12 +23,11 @@
     let vapidPublicKey = $state<string | null>(null);
     let subscriptionsCount = $state(0);
     let activeSubscription = $state<PushSubscription | null>(null);
-    let subscriptionSyncInProgress = false;
-    let subscriptionSynced = false;
     let permission = $state<NotificationPermission | 'unsupported'>('unsupported');
     let loading = $state(true);
     let pendingTopicId = $state<string | null>(null);
     let pendingSubscription = $state(false);
+    let removeAllDialogOpen = $state(false);
     let errorMessage = $state<string | null>(null);
     let successMessage = $state<string | null>(null);
     const gateway = getGatewayManager();
@@ -50,9 +50,8 @@
         return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     }
 
-    async function refreshSettings() {
-        loading = true;
-        errorMessage = null;
+    async function refreshSettings(initial = false) {
+        if (initial) loading = true;
         try {
             const response = await api.notifications.settings.get();
             if (response.error || !response.data) throw new Error('Einstellungen konnten nicht geladen werden.');
@@ -63,27 +62,11 @@
                 permission = Notification.permission;
                 const registration = await navigator.serviceWorker.getRegistration();
                 activeSubscription = await registration?.pushManager.getSubscription() ?? null;
-                if (activeSubscription && permission === 'granted' && !subscriptionSynced && !subscriptionSyncInProgress) {
-                    subscriptionSyncInProgress = true;
-                    try {
-                        const json = activeSubscription.toJSON();
-                        if (json.endpoint && json.keys?.p256dh && json.keys.auth) {
-                            const sync = await api.notifications.subscriptions.post({
-                                endpoint: json.endpoint,
-                                keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-                            });
-                            if (sync.error) throw new Error('Registrierung fehlgeschlagen');
-                            subscriptionSynced = true;
-                        }
-                    } finally {
-                        subscriptionSyncInProgress = false;
-                    }
-                }
             }
         } catch {
-            errorMessage = 'Benachrichtigungseinstellungen konnten nicht geladen werden.';
+            if (initial) errorMessage = 'Benachrichtigungseinstellungen konnten nicht geladen werden.';
         } finally {
-            loading = false;
+            if (initial) loading = false;
         }
     }
 
@@ -118,7 +101,8 @@
                 return;
             }
             const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.subscribe({
+            const existingSubscription = await registration.pushManager.getSubscription();
+            const subscription = existingSubscription ?? await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: encodeApplicationServerKey(vapidPublicKey),
             });
@@ -129,11 +113,10 @@
                 keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
             });
             if (response.error) {
-                await subscription.unsubscribe();
+                if (!existingSubscription) await subscription.unsubscribe();
                 throw new Error('Registrierung fehlgeschlagen');
             }
             activeSubscription = subscription;
-            subscriptionSynced = true;
             await refreshSettings();
             successMessage = 'Benachrichtigungen sind für dieses Gerät aktiviert.';
         } catch {
@@ -153,11 +136,34 @@
             if (response.error) throw new Error('Entfernen fehlgeschlagen');
             await activeSubscription.unsubscribe();
             activeSubscription = null;
-            subscriptionSynced = false;
             await refreshSettings();
             successMessage = 'Push-Benachrichtigungen sind für dieses Gerät deaktiviert.';
         } catch {
             errorMessage = 'Die Push-Registrierung konnte nicht entfernt werden.';
+        } finally {
+            pendingSubscription = false;
+        }
+    }
+
+    async function removeAllDevices() {
+        pendingSubscription = true;
+        errorMessage = null;
+        successMessage = null;
+        try {
+            const response = await api.notifications.subscriptions.all.delete();
+            if (response.error) throw new Error('Entfernen fehlgeschlagen');
+            if (activeSubscription) {
+                try {
+                    await activeSubscription.unsubscribe();
+                } catch {
+                    // The server subscription is already removed; a local browser error must not undo that result.
+                }
+                activeSubscription = null;
+            }
+            subscriptionsCount = 0;
+            successMessage = 'Alle registrierten Geräte wurden entfernt.';
+        } catch {
+            errorMessage = 'Die registrierten Geräte konnten nicht entfernt werden.';
         } finally {
             pendingSubscription = false;
         }
@@ -168,7 +174,7 @@
             if (event.type === 'notification-settings.changed') void refreshSettings();
         });
         const unsubscribeConnected = gateway.onConnected(() => void refreshSettings());
-        void refreshSettings();
+        void refreshSettings(true);
         return () => {
             unsubscribeEvent();
             unsubscribeConnected();
@@ -176,7 +182,7 @@
     });
 </script>
 
-<div class="flex flex-col gap-5">
+<div class="flex flex-col gap-5 pr-3">
     <div>
         <h2 class="font-semibold">Push-Benachrichtigungen</h2>
         <p class="mt-1 text-sm text-surface-contrast-400-800">Wähle aus, über welche Ereignisse du informiert werden möchtest. Themen sind standardmäßig ausgeschaltet.</p>
@@ -186,7 +192,7 @@
         <p class="text-sm text-surface-contrast-400-800" role="status">Einstellungen werden geladen …</p>
     {:else}
         <section class="rounded-lg border border-surface-300-700 p-4" aria-labelledby="push-device-title">
-            <h3 id="push-device-title" class="font-medium">Dieses Gerät</h3>
+            <h3 id="push-device-title" class="font-medium">Push-Geräte</h3>
             {#if !vapidPublicKey}
                 <p class="mt-2 text-sm text-surface-contrast-400-800">Push-Benachrichtigungen sind auf dem Server noch nicht eingerichtet.</p>
             {:else if permission === 'unsupported'}
@@ -204,6 +210,14 @@
                 {#if permission === 'denied'}
                     <p class="mt-2 text-sm text-warning-700-300">Benachrichtigungen sind im Browser blockiert. Ändere die Berechtigung in den Browsereinstellungen.</p>
                 {/if}
+            {/if}
+            {#if subscriptionsCount > 0 || activeSubscription}
+                <div class="mt-4 border-t border-surface-300-700 pt-3">
+                    <p class="text-sm text-surface-contrast-400-800">Entferne hiermit alle gespeicherten Push-Registrierungen auf deinen Geräten.</p>
+                    <Button type="button" variant="outlined" class="mt-3" disabled={pendingSubscription} onclick={() => removeAllDialogOpen = true}>
+                        Alle Geräte entfernen
+                    </Button>
+                </div>
             {/if}
         </section>
 
@@ -234,4 +248,14 @@
 
     {#if errorMessage}<p class="text-sm text-error-700-300" role="alert">{errorMessage}</p>{/if}
     {#if successMessage}<p class="text-sm text-success-700-300" role="status">{successMessage}</p>{/if}
+
+    <AlertDialog
+        bind:open={removeAllDialogOpen}
+        actionLabel={pendingSubscription ? 'Wird entfernt …' : 'Alle Geräte entfernen'}
+        variant="error"
+        onAction={() => void removeAllDevices()}
+    >
+        {#snippet title()}Alle Geräte entfernen?{/snippet}
+        {#snippet description()}Alle gespeicherten Push-Registrierungen werden entfernt. Push-Benachrichtigungen sind auf diesen Geräten anschließend deaktiviert.{/snippet}
+    </AlertDialog>
 </div>

@@ -75,6 +75,33 @@ describe('NotificationsService', () => {
         expect(settings.ok && settings.value.subscriptionsCount).toBe(1);
     });
 
+    it('removes all subscriptions belonging to one user and publishes settings invalidation', async () => {
+        await service.saveSubscription('user-1', {
+            endpoint: 'https://fcm.googleapis.com/user-one-device',
+            keys: { p256dh: 'public-key-one', auth: 'auth-secret-one' },
+        });
+        await service.saveSubscription('user-1', {
+            endpoint: 'https://updates.push.services.mozilla.com/user-one-device-two',
+            keys: { p256dh: 'public-key-two', auth: 'auth-secret-two' },
+        });
+        await service.saveSubscription('user-2', {
+            endpoint: 'https://fcm.googleapis.com/user-two-device',
+            keys: { p256dh: 'public-key-three', auth: 'auth-secret-three' },
+        });
+        broadcast.mockClear();
+
+        expect(await service.removeAllSubscriptions('user-1')).toMatchObject({ ok: true, value: 2 });
+        expect(broadcast).toHaveBeenCalledTimes(1);
+        expect(broadcast).toHaveBeenCalledWith(['user:user-1'], expect.objectContaining({
+            type: 'notification-settings.changed',
+            data: {},
+        }));
+        const alice = await service.getSettings('user-1');
+        const bob = await service.getSettings('user-2');
+        expect(alice.ok && alice.value.subscriptionsCount).toBe(0);
+        expect(bob.ok && bob.value.subscriptionsCount).toBe(1);
+    });
+
     it('does not let a different user take over an existing browser subscription', async () => {
         const subscription = {
             endpoint: 'https://fcm.googleapis.com/subscription-owned',
