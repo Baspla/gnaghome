@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { Modules } from '@gnaghome/shared/constants'
 import type { AuthenticatedUser, createAuthMiddleware } from '../auth'
 
-type UserServiceDependency = Pick<import('./service').UserService, 'getUserAsUser'>;
+type UserServiceDependency = Pick<import('./service').UserService, 'getUserAsUser' | 'listUsers'>;
 
 function toUserProfile(
     userData: import('./schema').RedactedUser | import('./schema').User,
@@ -26,6 +26,12 @@ export function createUserModule(authMiddleware: ReturnType<typeof createAuthMid
     .derive({ as: 'scoped' }, () => ({
         userService
     }))
+    .get('/', async ({ user, userService, status }) => {
+        if (!user.isAdmin) {
+            return status(403, { error: { code: 'FORBIDDEN', message: 'Für diese Aktion sind Administratorrechte erforderlich.' } });
+        }
+        return await userService.listUsers();
+    }, { auth: true })
     .get('/me', async ({ user, userService, status }) => {
         const result = await userService.getUserAsUser(user.id, user.id)
         if (!result.ok) {

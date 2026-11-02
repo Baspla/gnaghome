@@ -44,6 +44,6 @@
 
 <CustomDialog bind:open={settingsOpen} contentProps={{ interactOutsideBehavior: "close" }}>
     {#snippet title()}<p>Einstellungen</p>{/snippet}
-    {#snippet description()}<p>Profil, Darstellung und Benachrichtigungen verwalten.</p>{/snippet}
+    {#snippet description()}<p>Profil, Darstellung, Benachrichtigungen und Verwaltungseinstellungen verwalten.</p>{/snippet}
     <UserSettingsView />
 </CustomDialog>

@@ -5,12 +5,14 @@ export const Modules = {
     ACTIVITY_FEED: 'activity-feed',
     DISCUSSIONS: 'discussions',
     FILES: 'files',
+    CUSTOM_EMOJI: 'custom-emoji',
     NOTIFICATIONS: 'notifications',
 } as const;
 
 export const RealtimeChannels = {
     ACTIVITY_FEED: 'public:activity-feed',
     DISCUSSIONS: 'public:discussions',
+    CUSTOM_EMOJIS: 'public:custom-emojis',
 } as const;
 
 export type ModuleId = typeof Modules[keyof typeof Modules]; 

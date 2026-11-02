@@ -15,6 +15,7 @@ declare global {
 				email: string;
 				name: string;
 				image?: string | null;
+				isAdmin: boolean;
 				[key: string]: unknown;
 			} | null;
 		}

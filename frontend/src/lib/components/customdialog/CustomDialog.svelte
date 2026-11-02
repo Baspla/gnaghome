@@ -24,7 +24,7 @@
     <Dialog.Overlay class="fixed inset-0 z-50 bg-black/50" />
     <Dialog.Content
       {...contentProps}
-      class="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full bg-surface-50-950 rounded-2xl max-w-3xl p-3"
+      class="fixed left-[50%] top-[50%] z-50 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-2xl bg-surface-50-950 p-4 sm:max-w-5xl sm:p-6"
     >
       <Dialog.Title
         class="flex w-full justify-start text-lg font-bold tracking-tight text-surface-contrast-300-700"

@@ -1,7 +1,8 @@
 <script lang="ts">
-import { onDestroy, tick } from 'svelte';
+    import { onDestroy, tick } from 'svelte';
     import { api } from '$lib/api';
     import Button from '$lib/components/Button.svelte';
+    import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import PersonTagPicker from './PersonTagPicker.svelte';
 
     type Person = { id: string; name: string; image: string | null };
@@ -33,6 +34,7 @@ import { onDestroy, tick } from 'svelte';
     let isSubmitting = $state(false);
     let errorMessage = $state<string | null>(null);
     let caption = $state('');
+    let captionTextarea: HTMLTextAreaElement | undefined = $state();
     let taggedUserIds = $state<string[]>([]);
     let cameraStream: MediaStream | null = null;
     let videoElement: HTMLVideoElement | undefined = $state();
@@ -417,6 +419,21 @@ import { onDestroy, tick } from 'svelte';
         }
     }
 
+    async function insertCaptionEmoji(emoji: string) {
+        const textarea = captionTextarea;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        if (caption.length - (end - start) + emoji.length > 500) return;
+
+        textarea.setRangeText(emoji, start, end, 'end');
+        caption = textarea.value;
+        await tick();
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    }
+
     function retake() {
         if (isSubmitting) return;
         captureRun++;
@@ -495,8 +512,11 @@ import { onDestroy, tick } from 'svelte';
                 </div>
                 <div class="space-y-3">
                     <h3 id="caption-heading" class="font-semibold text-surface-950-50">Bildunterschrift <span class="font-normal text-surface-600-400">(optional)</span></h3>
-                    <textarea aria-labelledby="caption-heading" bind:value={caption} maxlength="500" rows="3" placeholder="Was möchtest du zu diesem Bild erzählen?" class="textarea w-full resize-y"></textarea>
-                    <span class="block text-right text-xs text-surface-600-400">{caption.length}/500</span>
+                    <textarea bind:this={captionTextarea} aria-labelledby="caption-heading" bind:value={caption} maxlength="500" rows="3" placeholder="Was möchtest du zu diesem Bild erzählen?" class="textarea w-full resize-y"></textarea>
+                    <div class="flex items-center justify-between gap-3">
+                        <EmojiPicker onSelect={(emoji) => void insertCaptionEmoji(emoji)} />
+                        <span class="text-xs text-surface-600-400">{caption.length}/500</span>
+                    </div>
                 </div>
                 <PersonTagPicker selectedIds={taggedUserIds} initialSelectedUsers={initialTaggedUsers} onChange={(ids) => taggedUserIds = ids} />
             </section>
@@ -512,8 +532,11 @@ import { onDestroy, tick } from 'svelte';
             <div class="mt-6 space-y-6">
                 <div class="space-y-3">
                     <h3 id="caption-heading" class="font-semibold text-surface-950-50">Bildunterschrift <span class="font-normal text-surface-600-400">(optional)</span></h3>
-                    <textarea aria-labelledby="caption-heading" bind:value={caption} maxlength="500" rows="3" placeholder="Was möchtest du zu diesem Bild erzählen?" class="textarea w-full resize-y"></textarea>
-                    <span class="block text-right text-xs text-surface-600-400">{caption.length}/500</span>
+                    <textarea bind:this={captionTextarea} aria-labelledby="caption-heading" bind:value={caption} maxlength="500" rows="3" placeholder="Was möchtest du zu diesem Bild erzählen?" class="textarea w-full resize-y"></textarea>
+                    <div class="flex items-center justify-between gap-3">
+                        <EmojiPicker onSelect={(emoji) => void insertCaptionEmoji(emoji)} />
+                        <span class="text-xs text-surface-600-400">{caption.length}/500</span>
+                    </div>
                 </div>
                 <PersonTagPicker selectedIds={taggedUserIds} initialSelectedUsers={initialTaggedUsers} onChange={(ids) => taggedUserIds = ids} />
             </div>

@@ -1,9 +1,11 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import Button from '$lib/components/Button.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
+    import EmojiPicker from '$lib/components/EmojiPicker.svelte';
+    import InlineText from '$lib/components/InlineText.svelte';
     import { page } from '$app/state';
     import { Label } from 'bits-ui';
     import { SquarePen, Trash } from '@lucide/svelte';
@@ -29,6 +31,7 @@
     let savingEdit = $state(false);
     let deletingId = $state<string | null>(null);
     let errorMessage = $state<string | null>(null);
+    let commentTextarea: HTMLTextAreaElement | undefined = $state();
     const gateway = getGatewayManager();
     const currentUserId = $derived(page.data.user?.id ?? '');
 
@@ -62,6 +65,21 @@
         } finally {
             submitting = false;
         }
+    }
+
+    async function insertEmoji(emoji: string) {
+        const textarea = commentTextarea;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        if (body.length - (end - start) + emoji.length > 5000) return;
+
+        textarea.setRangeText(emoji, start, end, 'end');
+        body = textarea.value;
+        await tick();
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
     }
 
     function startEdit(message: Message) {
@@ -121,6 +139,7 @@
         <Label.Root for={`new-comment-${discussionId}`} class="sr-only">Kommentar schreiben</Label.Root>
         <textarea
             id={`new-comment-${discussionId}`}
+            bind:this={commentTextarea}
             bind:value={body}
             maxlength="5000"
             rows="3"
@@ -128,7 +147,10 @@
             class="min-h-24 w-full resize-y rounded-xl border border-surface-300-700/60 bg-surface-50-950 px-3 py-2 text-sm text-surface-950-50 placeholder:text-surface-500-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
         ></textarea>
         <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-surface-600-400">Als {page.data.user?.name ?? 'du'}</span>
+            <div class="flex items-center gap-3">
+                <EmojiPicker onSelect={(emoji) => void insertEmoji(emoji)} />
+                <span class="text-xs text-surface-600-400">Als {page.data.user?.name ?? 'du'}</span>
+            </div>
             <Button type="submit" disabled={submitting || !body.trim()}>{submitting ? 'Wird gesendet …' : 'Kommentieren'}</Button>
         </div>
     </form>
@@ -174,7 +196,7 @@
                                 </div>
                             </form>
                         {:else}
-                            <p class="mt-1 whitespace-pre-wrap break-words text-sm text-surface-800-200">{message.body}</p>
+                            <InlineText text={message.body} class="mt-1 whitespace-pre-wrap break-words text-sm text-surface-800-200" />
                         {/if}
                     </div>
                 </li>

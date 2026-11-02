@@ -32,7 +32,10 @@ function makeTestApp() {
         getSession: async () => session,
         authHandler: async () => new Response('test auth handler'),
         adminGroupName: 'admins',
-        userService: { getUserAsUser },
+        userService: {
+            getUserAsUser,
+            listUsers: async () => [],
+        },
         activityFeedService: { getFeed: getActivityFeed },
         discussionsService: {} as AppDependencies['discussionsService'],
         discussionsFeedService: { getMessageCounts: async () => ({}) },
@@ -48,6 +51,11 @@ function makeTestApp() {
         filesService: {
             uploadFile: async () => ok({} as never),
             getFile: async () => ok({} as never),
+        },
+        customEmojiService: {
+            getCatalog: async () => ok([]),
+            createEmoji: async () => ok({} as never),
+            deleteEmoji: async () => ok(null),
         },
         crewNowService: {
             createId: () => 'test-post-id',

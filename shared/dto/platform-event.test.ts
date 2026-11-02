@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
-import { PlatformEventSchema, type ActivityFeedChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
+import { PlatformEventSchema, type ActivityFeedChangedEvent, type CustomEmojisChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
 import { isPlatformEvent } from './platform-event-validation';
 
 const app = new Elysia()
@@ -73,4 +73,17 @@ describe('PlatformEventSchema', () => {
         expect(isPlatformEvent({ ...event, data: { endpoint: 'https://secret.example' } })).toBe(false);
         expect(isPlatformEvent({ ...event, type: 'notification-settings.updated' })).toBe(false);
     });
+
+    it('accepts custom emoji invalidations without catalog contents', () => {
+        const event: CustomEmojisChangedEvent = {
+            id: 'event-custom-emojis-1',
+            occurredAt: '2026-11-02T12:00:00.000Z',
+            type: 'custom-emojis.changed',
+            data: {},
+        };
+        expect(isPlatformEvent(event)).toBe(true);
+        expect(isPlatformEvent({ ...event, data: { name: 'private-name' } })).toBe(false);
+        expect(isPlatformEvent({ ...event, type: 'custom-emojis.deleted' })).toBe(false);
+    });
+
 });

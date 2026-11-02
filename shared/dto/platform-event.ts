@@ -36,11 +36,24 @@ export const NotificationSettingsChangedEventSchema = t.Object({
 });
 export type NotificationSettingsChangedEvent = typeof NotificationSettingsChangedEventSchema.static;
 
+/** Global custom emoji catalogue invalidation; clients refetch its persisted contents. */
+export const CustomEmojisChangedPayloadSchema = t.Object({});
+export type CustomEmojisChangedPayload = typeof CustomEmojisChangedPayloadSchema.static;
+
+export const CustomEmojisChangedEventSchema = t.Object({
+    id: t.String(),
+    occurredAt: t.String(),
+    type: t.Literal('custom-emojis.changed'),
+    data: CustomEmojisChangedPayloadSchema,
+});
+export type CustomEmojisChangedEvent = typeof CustomEmojisChangedEventSchema.static;
+
 /** Discriminated union of all platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
     DiscussionChangedEventSchema,
     NotificationSettingsChangedEventSchema,
+    CustomEmojisChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;
