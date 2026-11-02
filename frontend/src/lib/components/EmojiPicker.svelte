@@ -1,38 +1,46 @@
 <script lang="ts">
-    import { Popover } from 'bits-ui';
-    import { Smile } from '@lucide/svelte';
+    import { Label, Popover } from 'bits-ui';
+    import { Search, Smile } from '@lucide/svelte';
 
-    type Emoji = { value: string; label: string };
+    type Emoji = { value: string; label: string; keywords: string[] };
     type Props = { onSelect: (emoji: string) => void };
 
     let { onSelect }: Props = $props();
     let open = $state(false);
+    let searchQuery = $state('');
     const pickerId = $props.id();
 
     const normalEmojis: Emoji[] = [
-        { value: '🔥', label: 'Feuer' },
-        { value: '♥️', label: 'Herz' },
-        { value: '😂', label: 'Lachen mit Tränen' },
-        { value: '🥰', label: 'Verliebt' },
-        { value: '😭', label: 'Weinen' },
-        { value: '👀', label: 'Augen' },
-        { value: '🎉', label: 'Konfetti' },
-        { value: '😅', label: 'Lächeln mit Schweiß' },
-        { value: '💀', label: 'Totenkopf' },
-        { value: '👍', label: 'Daumen hoch' },
-        { value: '👋', label: 'Winken' },
-        { value: '😎', label: 'Cool' },
-        { value: '🥵', label: 'Heiß' },
-        { value: '😵‍💫', label: 'Benommen' },
-        { value: '😡', label: 'Wütend' },
-        { value: '🫣', label: 'Durch die Finger schauen' },
-        { value: '🤓', label: 'Nerd' },
-        { value: '💩', label: 'Kackhaufen' },
-        { value: '🫪', label: 'Blasen' },
+        { value: '🔥', label: 'Feuer', keywords: ['fire', 'flame', 'hot', 'heiß', 'brennen',"banger"] },
+        { value: '♥️', label: 'Herz', keywords: ['heart', 'love', 'liebe', 'herz'] },
+        { value: '😂', label: 'Lachen mit Tränen', keywords: ['laugh', 'tears', 'joy', 'lachen', 'tränen', 'freude'] },
+        { value: '🥰', label: 'Verliebt', keywords: ['love', 'hearts', 'adore', 'liebe', 'verliebt', 'herzen'] },
+        { value: '😭', label: 'Weinen', keywords: ['cry', 'sad', 'sobbing', 'weinen', 'traurig', 'schluchzen'] },
+        { value: '👀', label: 'Augen', keywords: ['eyes', 'look', 'see', 'augen', 'schauen', 'sehen'] },
+        { value: '🎉', label: 'Konfetti', keywords: ['party', 'celebration', 'tada', 'feier', 'geburtstag', 'konfetti'] },
+        { value: '😅', label: 'Lächeln mit Schweiß', keywords: ['sweat', 'nervous', 'relief', 'schweiß', 'nervös', 'erleichtert'] },
+        { value: '💀', label: 'Totenkopf', keywords: ['skull', 'dead', 'death', 'totenkopf', 'tot', 'sterben'] },
+        { value: '👍', label: 'Daumen hoch', keywords: ['thumbs up', 'like', 'approve', 'daumen hoch', 'gut', 'zustimmen'] },
+        { value: '👋', label: 'Winken', keywords: ['wave', 'hello', 'goodbye', 'winken', 'hallo', 'tschüss'] },
+        { value: '😎', label: 'Cool', keywords: ['cool', 'sunglasses', 'awesome', 'sonnenbrille', 'lässig', 'klasse'] },
+        { value: '🥵', label: 'Heiß', keywords: ['hot', 'heat', 'sweating', 'heiß', 'hitze', 'schwitzen'] },
+        { value: '😵‍💫', label: 'Benommen', keywords: ['dizzy', 'confused', 'woozy', 'schwindelig', 'verwirrt', 'benommen'] },
+        { value: '😡', label: 'Wütend', keywords: ['angry', 'mad', 'rage', 'wütend', 'sauer', 'zorn'] },
+        { value: '🫣', label: 'Durch die Finger schauen', keywords: ['peeking', 'shy', 'scared', 'spicken', 'schüchtern', 'ängstlich'] },
+        { value: '🤓', label: 'Nerd', keywords: ['nerd', 'geek', 'glasses', 'brille', 'streber'] },
+        { value: '💩', label: 'Kackhaufen', keywords: ['poop', 'shit', 'poo', 'kacke', 'scheiße', 'haufen'] },
+        { value: '🫪', label: 'Wahnsinn', keywords: ['closeup', 'lens', 'freaky', 'nah','distorted'] },
     ];
+    const normalizedQuery = $derived(searchQuery.trim().toLowerCase());
+    const filteredEmojis = $derived(normalEmojis.filter((emoji) =>
+        emoji.value.includes(normalizedQuery)
+            || emoji.label.toLowerCase().includes(normalizedQuery)
+            || emoji.keywords.some((keyword) => keyword.toLowerCase().includes(normalizedQuery)),
+    ));
 
     function chooseEmoji(emoji: Emoji) {
         onSelect(emoji.value);
+        searchQuery = '';
         open = false;
     }
 </script>
@@ -54,27 +62,45 @@
             sideOffset={8}
             aria-label="Emoji auswählen"
         >
-            <div class="max-h-[min(17rem,70dvh)] space-y-3 overflow-y-auto">
-                <section aria-labelledby={`${pickerId}-normal-emojis-heading`}>
-                    <h3 id={`${pickerId}-normal-emojis-heading`} class="mb-1 px-1 text-xs font-medium text-surface-600-400">Normale Emojis</h3>
-                    <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
-                        {#each normalEmojis as emoji (emoji.value)}
-                            <button
-                                type="button"
-                                class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
-                                aria-label={`${emoji.label} einfügen`}
-                                title={emoji.label}
-                                onclick={() => chooseEmoji(emoji)}
-                            >
-                                {emoji.value}
-                            </button>
-                        {/each}
-                    </div>
-                </section>
-                <section aria-labelledby={`${pickerId}-custom-emojis-heading`}>
-                    <h3 id={`${pickerId}-custom-emojis-heading`} class="mb-1 px-1 text-xs font-medium text-surface-600-400">Custom Emoji</h3>
-                    <p class="px-1 py-2 text-sm text-surface-600-400">Noch keine Custom Emojis verfügbar.</p>
-                </section>
+            <div class="flex max-h-[min(17rem,70dvh)] flex-col gap-3">
+                <div class="relative block shrink-0">
+                    <Label.Root for={`${pickerId}-search`} class="sr-only">Emojis suchen</Label.Root>
+                    <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500-400" aria-hidden="true" />
+                    <input
+                        id={`${pickerId}-search`}
+                        type="search"
+                        bind:value={searchQuery}
+                        placeholder="Emoji suchen …"
+                        class="input w-full pl-9"
+                        autocomplete="off"
+                    />
+                </div>
+                <div id={`${pickerId}-emoji-results`} class="min-h-0 space-y-3 overflow-y-auto">
+                    <section aria-labelledby={`${pickerId}-normal-emojis-heading`}>
+                        <h3 id={`${pickerId}-normal-emojis-heading`} class="mb-1 px-1 text-xs font-medium text-surface-600-400">Normale Emojis</h3>
+                        <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
+                            {#if filteredEmojis.length > 0}
+                                {#each filteredEmojis as emoji (emoji.value)}
+                                    <button
+                                        type="button"
+                                        class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
+                                        aria-label={`${emoji.label} einfügen`}
+                                        title={emoji.label}
+                                        onclick={() => chooseEmoji(emoji)}
+                                    >
+                                        {emoji.value}
+                                    </button>
+                                {/each}
+                            {:else}
+                                <p class="col-span-full px-1 py-2 text-sm text-surface-600-400">Keine passenden Emojis gefunden.</p>
+                            {/if}
+                        </div>
+                    </section>
+                    <section aria-labelledby={`${pickerId}-custom-emojis-heading`}>
+                        <h3 id={`${pickerId}-custom-emojis-heading`} class="mb-1 px-1 text-xs font-medium text-surface-600-400">Custom Emoji</h3>
+                        <p class="px-1 py-2 text-sm text-surface-600-400">Noch keine Custom Emojis verfügbar.</p>
+                    </section>
+                </div>
             </div>
         </Popover.Content>
     </Popover.Portal>
