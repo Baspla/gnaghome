@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import Button from '$lib/components/Button.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import { page } from '$app/state';
-    import { Label } from 'bits-ui';
-    import { SquarePen, Trash } from '@lucide/svelte';
+    import { Label, Popover } from 'bits-ui';
+    import { Smile, SquarePen, Trash } from '@lucide/svelte';
 
     type Message = {
         id: string;
@@ -29,8 +29,31 @@
     let savingEdit = $state(false);
     let deletingId = $state<string | null>(null);
     let errorMessage = $state<string | null>(null);
+    let emojiPickerOpen = $state(false);
+    let commentTextarea: HTMLTextAreaElement | undefined = $state();
     const gateway = getGatewayManager();
     const currentUserId = $derived(page.data.user?.id ?? '');
+    const normalEmojis = [
+        { value: '🔥', label: 'Feuer' },
+        { value: '♥️', label: 'Herz' },
+        { value: '😂', label: 'Lachen mit Tränen' },
+        { value: '🥰', label: 'Verliebt' },
+        { value: '😭', label: 'Weinen' },
+        { value: '👀', label: 'Augen' },
+        { value: '🎉', label: 'Konfetti' },
+        { value: '😅', label: 'Lächeln mit Schweiß' },
+        { value: '💀', label: 'Totenkopf' },
+        { value: '👍', label: 'Daumen hoch' },
+        { value: '👋', label: 'Winken' },
+        { value: '😎', label: 'Cool' },
+        { value: '🥵', label: 'Heiß' },
+        { value: '😵‍💫', label: 'Benommen' },
+        { value: '😡', label: 'Wütend' },
+        { value: '🫣', label: 'Durch die Finger schauen' },
+        { value: '🤓', label: 'Nerd' },
+        { value: '💩', label: 'Kackhaufen' },
+        { value: '🫪', label: 'Blasen' },
+    ];
 
     async function loadMessages() {
         loading = messages.length === 0;
@@ -62,6 +85,23 @@
         } finally {
             submitting = false;
         }
+    }
+
+    async function insertEmoji(emoji: string) {
+        const textarea = commentTextarea;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const availableLength = 5000 - (body.length - (end - start));
+        if (emoji.length > availableLength) return;
+
+        textarea.setRangeText(emoji, start, end, 'end');
+        body = textarea.value;
+        emojiPickerOpen = false;
+        await tick();
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
     }
 
     function startEdit(message: Message) {
@@ -121,6 +161,7 @@
         <Label.Root for={`new-comment-${discussionId}`} class="sr-only">Kommentar schreiben</Label.Root>
         <textarea
             id={`new-comment-${discussionId}`}
+            bind:this={commentTextarea}
             bind:value={body}
             maxlength="5000"
             rows="3"
@@ -128,7 +169,51 @@
             class="min-h-24 w-full resize-y rounded-xl border border-surface-300-700/60 bg-surface-50-950 px-3 py-2 text-sm text-surface-950-50 placeholder:text-surface-500-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
         ></textarea>
         <div class="flex items-center justify-between gap-3">
-            <span class="text-xs text-surface-600-400">Als {page.data.user?.name ?? 'du'}</span>
+            <div class="flex items-center gap-3">
+                <Popover.Root bind:open={emojiPickerOpen}>
+                    <Popover.Trigger
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        aria-label="Emoji auswählen"
+                        title="Emoji einfügen"
+                    >
+                        <Smile class="h-4 w-4" aria-hidden="true" />
+                        <span>Emoji</span>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                        <Popover.Content
+                            class="z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-surface-300-700 bg-surface-50-950 p-3 shadow-lg"
+                            align="start"
+                            sideOffset={8}
+                            aria-label="Emoji auswählen"
+                        >
+                            <div class="max-h-[min(17rem,70dvh)] space-y-3 overflow-y-auto">
+                                <section aria-labelledby="normal-emojis-heading">
+                                    <h3 id="normal-emojis-heading" class="mb-1 px-1 text-xs font-medium text-surface-600-400">Normale Emojis</h3>
+                                    <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
+                                        {#each normalEmojis as emoji (emoji.value)}
+                                            <button
+                                                type="button"
+                                                class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
+                                                aria-label={`${emoji.label} einfügen`}
+                                                title={emoji.label}
+                                                onclick={() => void insertEmoji(emoji.value)}
+                                            >
+                                                {emoji.value}
+                                            </button>
+                                        {/each}
+                                    </div>
+                                </section>
+                                <section aria-labelledby="custom-emojis-heading">
+                                    <h3 id="custom-emojis-heading" class="mb-1 px-1 text-xs font-medium text-surface-600-400">Custom Emoji</h3>
+                                    <p class="px-1 py-2 text-sm text-surface-600-400">Noch keine Custom Emojis verfügbar.</p>
+                                </section>
+                            </div>
+                        </Popover.Content>
+                    </Popover.Portal>
+                </Popover.Root>
+                <span class="text-xs text-surface-600-400">Als {page.data.user?.name ?? 'du'}</span>
+            </div>
             <Button type="submit" disabled={submitting || !body.trim()}>{submitting ? 'Wird gesendet …' : 'Kommentieren'}</Button>
         </div>
     </form>
