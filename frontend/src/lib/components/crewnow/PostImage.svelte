@@ -1,4 +1,5 @@
 <script lang="ts">
+    import InlineText from '$lib/components/InlineText.svelte';
     type Props = {
         backImageUrl: string;
         frontImageUrl: string;
@@ -73,6 +74,6 @@
         {/if}
     </div>
     {#if caption}
-        <figcaption class="mt-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200">{caption}</figcaption>
+        <figcaption class="mt-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200"><InlineText text={caption} /></figcaption>
     {/if}
 </figure>

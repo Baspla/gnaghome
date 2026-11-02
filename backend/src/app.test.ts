@@ -52,6 +52,11 @@ function makeTestApp() {
             uploadFile: async () => ok({} as never),
             getFile: async () => ok({} as never),
         },
+        customEmojiService: {
+            getCatalog: async () => ok([]),
+            createEmoji: async () => ok({} as never),
+            deleteEmoji: async () => ok(null),
+        },
         crewNowService: {
             createId: () => 'test-post-id',
             createPost: async () => ok({} as never),

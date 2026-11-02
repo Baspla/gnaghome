@@ -10,12 +10,14 @@ import { createFilesModule } from './platform/files/module';
 import { createCrewNowModule } from './apps/crewnow/module';
 import { createDiscussionsModule } from './platform/discussions/module';
 import { createNotificationsModule } from './platform/notifications/module';
+import { createCustomEmojiModule } from './platform/custom-emoji/module';
 
 const logger = createLogger('app');
 
 type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser' | 'listUsers'>;
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
+type CustomEmojiServiceDependency = Pick<import('./platform/custom-emoji/service').CustomEmojiService, 'getCatalog' | 'createEmoji' | 'deleteEmoji'>;
 type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
@@ -29,6 +31,7 @@ export type AppDependencies = {
     userService: UserServiceDependency;
     activityFeedService: ActivityFeedServiceDependency;
     filesService: FilesServiceDependency;
+    customEmojiService: CustomEmojiServiceDependency;
     crewNowService: CrewNowServiceDependency;
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
@@ -87,6 +90,7 @@ export function createApp(dependencies: AppDependencies) {
                         .use(createDiscussionsModule(authMiddleware, dependencies.discussionsService, dependencies.canViewDiscussionTarget))
                         .use(createNotificationsModule(authMiddleware, dependencies.notificationsService, dependencies.vapidPublicKey))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
+                        .use(createCustomEmojiModule(authMiddleware, dependencies.customEmojiService))
                         .use(createCrewNowModule(authMiddleware, dependencies.crewNowService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )

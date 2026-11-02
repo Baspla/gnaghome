@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Label, Popover } from 'bits-ui';
     import { Search, Smile } from '@lucide/svelte';
+    import { getCustomEmojis } from '$lib/custom-emoji-catalog.svelte';
 
     type Emoji = { value: string; label: string; keywords: string[] };
     type Props = { onSelect: (emoji: string) => void };
@@ -9,6 +10,7 @@
     let open = $state(false);
     let searchQuery = $state('');
     const pickerId = $props.id();
+    const customEmojis = $derived(getCustomEmojis());
 
     const normalEmojis: Emoji[] = [
         { value: '🔥', label: 'Feuer', keywords: ['fire', 'flame', 'hot', 'heiß', 'brennen',"banger"] },
@@ -36,6 +38,9 @@
         emoji.value.includes(normalizedQuery)
             || emoji.label.toLowerCase().includes(normalizedQuery)
             || emoji.keywords.some((keyword) => keyword.toLowerCase().includes(normalizedQuery)),
+    ));
+    const filteredCustomEmojis = $derived(customEmojis.filter((emoji) =>
+        emoji.name.toLowerCase().includes(normalizedQuery) || `:${emoji.name}:`.includes(normalizedQuery),
     ));
 
     function chooseEmoji(emoji: Emoji) {
@@ -98,7 +103,23 @@
                     </section>
                     <section aria-labelledby={`${pickerId}-custom-emojis-heading`}>
                         <h3 id={`${pickerId}-custom-emojis-heading`} class="mb-1 px-1 text-xs font-medium text-surface-600-400">Custom Emoji</h3>
-                        <p class="px-1 py-2 text-sm text-surface-600-400">Noch keine Custom Emojis verfügbar.</p>
+                        {#if filteredCustomEmojis.length === 0}
+                            <p class="px-1 py-2 text-sm text-surface-600-400">{customEmojis.length === 0 ? 'Noch keine Custom Emojis verfügbar.' : 'Keine passenden Custom Emojis gefunden.'}</p>
+                        {:else}
+                            <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
+                                {#each filteredCustomEmojis as emoji (emoji.name)}
+                                    <button
+                                        type="button"
+                                        class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
+                                        aria-label={`${emoji.name} einfügen`}
+                                        title={`:${emoji.name}:`}
+                                        onclick={() => { onSelect(`:${emoji.name}:`); searchQuery = ''; open = false; }}
+                                    >
+                                        <img src={emoji.url} alt="" class="h-[1em] w-[1em] object-contain" />
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
                     </section>
                 </div>
             </div>

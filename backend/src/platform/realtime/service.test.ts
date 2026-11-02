@@ -29,6 +29,7 @@ describe('Centrifugo publisher', () => {
         const payload = await jose.jwtVerify(result.value, new TextEncoder().encode(env.CENTRIFUGO_SECRET));
         expect(payload.payload.channels).toContain('public:activity-feed');
         expect(payload.payload.channels).toContain('public:discussions');
+        expect(payload.payload.channels).toContain('public:custom-emojis');
         expect(payload.payload.channels).toContain('user:user-1');
     });
 

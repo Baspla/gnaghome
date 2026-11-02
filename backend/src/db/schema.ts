@@ -5,4 +5,5 @@ export * from '../platform/discussions/schema';
 export * from '../platform/files/schema';
 export * from '../platform/tasks/schema';
 export * from '../platform/notifications/schema';
+export * from '../platform/custom-emoji/schema';
 export * from '../apps/crewnow/schema';

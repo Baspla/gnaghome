@@ -8,6 +8,7 @@ import { DiscussionsService } from './platform/discussions/service';
 import { TasksService } from './platform/tasks';
 import { NotificationsService } from './platform/notifications/service';
 import { createWebPushSender, type VapidConfig } from './platform/notifications/push';
+import { CustomEmojiService } from './platform/custom-emoji/service';
 
 export function createServices(
     db: AppDatabase,
@@ -21,9 +22,10 @@ export function createServices(
     const discussions = new DiscussionsService(db, broadcast, notifications);
     const tasks = new TasksService(db);
     const files = new FilesService(db, new LocalFileStorage(filesDirectory));
+    const customEmoji = new CustomEmojiService(db, files, broadcast);
     const crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);
 
-    return { users, activityFeed, discussions, files, crewnow, tasks, notifications };
+    return { users, activityFeed, discussions, files, customEmoji, crewnow, tasks, notifications };
 }

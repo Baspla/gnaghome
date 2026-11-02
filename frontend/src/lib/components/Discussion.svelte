@@ -5,6 +5,7 @@
     import Button from '$lib/components/Button.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
+    import InlineText from '$lib/components/InlineText.svelte';
     import { page } from '$app/state';
     import { Label } from 'bits-ui';
     import { SquarePen, Trash } from '@lucide/svelte';
@@ -195,7 +196,7 @@
                                 </div>
                             </form>
                         {:else}
-                            <p class="mt-1 whitespace-pre-wrap break-words text-sm text-surface-800-200">{message.body}</p>
+                            <InlineText text={message.body} class="mt-1 whitespace-pre-wrap break-words text-sm text-surface-800-200" />
                         {/if}
                     </div>
                 </li>

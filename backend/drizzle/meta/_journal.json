@@ -50,6 +50,13 @@
       "when": 1793485730552,
       "tag": "0006_moaning_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793581680930,
+      "tag": "0007_damp_tenebrous",
+      "breakpoints": true
     }
   ]
 }

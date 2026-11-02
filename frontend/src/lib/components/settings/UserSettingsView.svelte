@@ -9,8 +9,11 @@
     import Monitor from "@lucide/svelte/icons/monitor";
     import Bell from "@lucide/svelte/icons/bell";
     import Users from "@lucide/svelte/icons/users";
+    import Smile from "@lucide/svelte/icons/smile";
     import { api } from "$lib/api";
+    import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
+    import { getCustomEmojis, refreshCustomEmojis } from "$lib/custom-emoji-catalog.svelte";
 
     const user = $derived(page.data.user ?? null);
     type SettingsSection = "profile" | "appearance" | "notifications";
@@ -20,11 +23,35 @@
         { id: "notifications", label: "Benachrichtigungen", icon: Bell },
     ];
     type AdminUser = { id: string; name: string; email: string; image: string | null };
-    let activeSection = $state<SettingsSection | "users">("profile");
+    type AdminSection = "users" | "custom-emojis";
+    let activeSection = $state<SettingsSection | AdminSection>("profile");
     let adminUsers = $state<AdminUser[]>([]);
     let adminUsersLoading = $state(false);
     let adminUsersLoaded = $state(false);
     let adminUsersError = $state(false);
+    let customEmojiName = $state('');
+    let customEmojiFile = $state<File | null>(null);
+    let customEmojiBusy = $state(false);
+    let customEmojiError = $state<string | null>(null);
+    let customEmojiSuccess = $state<string | null>(null);
+    const customEmojis = $derived(getCustomEmojis());
+
+    function apiErrorMessage(response: unknown, fallback: string): string | null {
+        const requestError: unknown = typeof response === 'object' && response !== null
+            ? Reflect.get(response, 'error')
+            : undefined;
+        if (requestError === undefined || requestError === null) return null;
+        const errorValue: unknown = typeof requestError === 'object' && requestError !== null
+            ? Reflect.get(requestError, 'value')
+            : undefined;
+        const errorBody: unknown = typeof errorValue === 'object' && errorValue !== null
+            ? Reflect.get(errorValue, 'error')
+            : undefined;
+        const message: unknown = typeof errorBody === 'object' && errorBody !== null
+            ? Reflect.get(errorBody, 'message')
+            : undefined;
+        return typeof message === 'string' ? message : fallback;
+    }
 
     async function loadAdminUsers() {
         if (adminUsersLoaded || adminUsersLoading) return;
@@ -42,9 +69,54 @@
         }
     }
 
-    function selectSection(section: SettingsSection | "users") {
+    async function selectSection(section: SettingsSection | AdminSection) {
         activeSection = section;
         if (section === "users") void loadAdminUsers();
+        if (section === "custom-emojis") await refreshCustomEmojis();
+    }
+
+    async function createCustomEmoji(event: SubmitEvent) {
+        event.preventDefault();
+        if (!customEmojiFile || customEmojiBusy) return;
+        customEmojiBusy = true;
+        customEmojiError = null;
+        customEmojiSuccess = null;
+        try {
+            const response = await api['custom-emojis'].post({
+                name: customEmojiName,
+                file: customEmojiFile,
+            });
+            const errorMessage = apiErrorMessage(response, 'Das Emoji konnte nicht hochgeladen werden.');
+            if (errorMessage) throw new Error(errorMessage);
+            customEmojiName = '';
+            customEmojiFile = null;
+            const fileInput = document.getElementById('custom-emoji-file') as HTMLInputElement | null;
+            if (fileInput) fileInput.value = '';
+            customEmojiSuccess = 'Custom Emoji wurde hinzugefügt.';
+            await refreshCustomEmojis();
+        } catch (error) {
+            customEmojiError = error instanceof Error ? error.message : 'Das Emoji konnte nicht hochgeladen werden.';
+        } finally {
+            customEmojiBusy = false;
+        }
+    }
+
+    async function deleteCustomEmoji(name: string) {
+        if (customEmojiBusy) return;
+        customEmojiBusy = true;
+        customEmojiError = null;
+        customEmojiSuccess = null;
+        try {
+            const response = await api['custom-emojis']({ name }).delete();
+            const errorMessage = apiErrorMessage(response, 'Das Emoji konnte nicht gelöscht werden.');
+            if (errorMessage) throw new Error(errorMessage);
+            customEmojiSuccess = `:${name}: wurde gelöscht.`;
+            await refreshCustomEmojis();
+        } catch (error) {
+            customEmojiError = error instanceof Error ? error.message : 'Das Emoji konnte nicht gelöscht werden.';
+        } finally {
+            customEmojiBusy = false;
+        }
     }
 
     async function logout() {
@@ -54,7 +126,7 @@
 </script>
 
 <div class="flex h-[min(70vh,36rem)] min-h-0 flex-col gap-3 md:flex-row md:gap-4">
-    <nav aria-label="Einstellungen" class="flex w-full shrink-0 gap-1 overflow-x-auto md:w-48 md:flex-col md:overflow-x-visible">
+    <nav aria-label="Einstellungen" class="flex w-full shrink-0 gap-1 overflow-x-auto pb-2 md:w-48 md:flex-col md:overflow-x-visible md:pb-0">
         {#each sections as section (section.id)}
             <button
                 type="button"
@@ -84,6 +156,18 @@
                 >
                     <Users class="h-4 w-4" />
                     Benutzer
+                </button>
+                <button
+                    type="button"
+                    aria-pressed={activeSection === "custom-emojis"}
+                    class="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors
+                        {activeSection === "custom-emojis"
+                            ? 'bg-primary-500 text-primary-contrast-500'
+                            : 'hover:bg-surface-100 hover:text-surface-contrast-100'}"
+                    onclick={() => void selectSection("custom-emojis")}
+                >
+                    <Smile class="h-4 w-4" />
+                    Custom Emoji
                 </button>
             </div>
         {/if}
@@ -145,6 +229,66 @@
             </div>
         {:else if activeSection === "notifications"}
             <NotificationSettings />
+        {:else if activeSection === "custom-emojis"}
+            <section aria-labelledby="admin-custom-emojis-heading" class="flex flex-col gap-4">
+                <div>
+                    <h2 id="admin-custom-emojis-heading" class="text-lg font-semibold">Custom Emoji</h2>
+                    <p class="mt-1 text-sm text-surface-contrast-400-800">Emoji-Namen werden in Texten als <code>:name:</code> gespeichert.</p>
+                </div>
+                <form class="flex flex-col gap-3 rounded-xl border border-surface-300-700/50 p-3" onsubmit={createCustomEmoji}>
+                    <label class="flex flex-col gap-1 text-sm">
+                        <span class="font-medium">Name</span>
+                        <input class="input w-full" bind:value={customEmojiName} maxlength="32" pattern="[a-z0-9][a-z0-9_-]*" placeholder="gnag_wave" required />
+                        <span class="text-xs text-surface-contrast-400-800">Kleinbuchstaben, Zahlen, _ und -</span>
+                    </label>
+                    <label class="flex flex-col gap-1 text-sm">
+                        <span class="font-medium">Bild</span>
+                        <input id="custom-emoji-file" class="input w-full" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/apng" required onchange={(event) => customEmojiFile = event.currentTarget.files?.[0] ?? null} />
+                        <span class="text-xs text-surface-contrast-400-800">PNG, JPEG, GIF, WebP, AVIF oder APNG; maximal 10 MB. Animation bleibt erhalten.</span>
+                    </label>
+                    <div class="flex justify-end">
+                        <button class="btn preset-filled" type="submit" disabled={customEmojiBusy || !customEmojiFile}>{customEmojiBusy ? 'Wird gespeichert …' : 'Emoji hinzufügen'}</button>
+                    </div>
+                </form>
+                {#if customEmojiError}<p class="text-sm text-error-700-300" role="alert">{customEmojiError}</p>{/if}
+                {#if customEmojiSuccess}<p class="text-sm text-success-700-300" role="status">{customEmojiSuccess}</p>{/if}
+                {#if customEmojis.length === 0}
+                    <p class="text-sm text-surface-contrast-400-800">Noch keine Custom Emojis vorhanden.</p>
+                {:else}
+                    <ul class="flex flex-col divide-y divide-surface-300-700" aria-label="Custom Emoji">
+                        {#each customEmojis as emoji (emoji.name)}
+                            <li class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+                                <Popover positioning={{ placement: 'bottom-start', gutter: 8 }}>
+                                    <Popover.Trigger
+                                        type="button"
+                                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-surface-300-700/50 bg-surface-50-950 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                        aria-label={`Details zu :${emoji.name}: anzeigen`}
+                                    >
+                                        <img src={emoji.url} alt="" class="h-8 w-8 object-contain" />
+                                    </Popover.Trigger>
+                                    <Popover.Positioner>
+                                        <Popover.Content class="z-50 w-64 rounded-xl border border-surface-300-700 bg-surface-50-950 p-4 shadow-lg">
+                                            <Popover.Title class="font-semibold text-surface-950-50">:{emoji.name}:</Popover.Title>
+                                            <Popover.Description class="mt-1 text-sm text-surface-600-400">
+                                                Hochgeladen von {emoji.uploadedByName} am {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(emoji.createdAt))}
+                                            </Popover.Description>
+                                            <img src={emoji.url} alt={`Vorschau für :${emoji.name}:`} class="mx-auto mt-3 h-16 w-16 object-contain" />
+                                        </Popover.Content>
+                                    </Popover.Positioner>
+                                </Popover>
+                                <div class="min-w-32 flex-1">
+                                    <code class="block truncate font-semibold">:{emoji.name}:</code>
+                                    <span class="block text-sm text-surface-600-400">Uploader: {emoji.uploadedByName}</span>
+                                    <time class="block text-sm text-surface-600-400" datetime={emoji.createdAt}>
+                                        {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(emoji.createdAt))}
+                                    </time>
+                                </div>
+                                <button type="button" class="btn preset-outlined-error" disabled={customEmojiBusy} onclick={() => void deleteCustomEmoji(emoji.name)}>Löschen</button>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </section>
         {:else}
             <section aria-labelledby="admin-users-heading" class="flex flex-col gap-4">
                 <div>
