@@ -29,7 +29,7 @@
         {
             "bg-primary-500 text-primary-contrast-500 rounded-xl": isActive,
             "hover:bg-primary-300 hover:text-primary-contrast-300": !isActive && !disabled,
-            "pointer-events-none": disabled,
+            "pointer-events-none opacity-50": disabled,
         },
     ]}
 >

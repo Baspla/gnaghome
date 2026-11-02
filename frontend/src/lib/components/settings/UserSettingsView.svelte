@@ -186,6 +186,7 @@
                     </div>
                 </div>
                 <button type="button" class="btn preset-outlined-error" onclick={logout}>Abmelden</button>
+                <p class="text-center text-xs text-surface-contrast-400-800">Version {__APP_VERSION__}</p>
             </div>
         {:else if activeSection === "appearance"}
             <div class="flex flex-col gap-6">

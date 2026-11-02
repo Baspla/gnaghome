@@ -9,6 +9,11 @@
 - Prefer reusable platform systems and clear module contracts where they make sense. Avoid solving only the immediate example with one-off, feature-local logic when the behavior is likely to be shared; balance reuse against unnecessary abstraction.
 - Preserve the small, self-hostable deployment goal. Avoid introducing infrastructure that is disproportionate to the current scale.
 
+## Application version
+
+- The root `package.json` `version` is the single source of truth for the application version. Increment it using semantic versioning: patch for backward-compatible fixes, minor for backward-compatible features, and major for breaking changes.
+- When bumping the application version, update only the root `package.json`. Do not duplicate or synchronize it manually in the frontend, backend, or shared package manifests; application code and build configuration must derive the displayed/runtime version from the root manifest.
+
 ## Frontend UI direction
 
 - Write user-facing frontend text in German, including labels, buttons, headings, helper and error messages, and accessible names. Keep technical identifiers, code symbols, and third-party product names in their original form where appropriate.
