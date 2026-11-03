@@ -9,6 +9,7 @@ import { createLogger } from "$lib/logger";
 import { toaster } from "$lib/toaster";
 
 const logger = createLogger("gateway");
+const DISCONNECTED_NOTIFICATION_DELAY_MS = 2000;
 
 type PlatformEventHandler = (event: PlatformEvent) => void;
 type ConnectionHandler = () => void;
@@ -43,6 +44,8 @@ export class GatewayManager {
     private handlers = new Set<PlatformEventHandler>();
     private connectionHandlers = new Set<ConnectionHandler>();
     private connected = false;
+    private disconnectedNotificationTimer: ReturnType<typeof setTimeout> | undefined;
+    private isDisconnecting = false;
 
     /**
      * Register a handler for a specific event type.
@@ -63,16 +66,12 @@ export class GatewayManager {
     connect() {
         logger.info("connecting to Centrifugo");
         this.centrifuge.on("error", (context) => {
-            logger.error(context.error.message)
-            if(context.error.message == "transport closed"){
-                toaster.error({
-                    title: "Error connecting to Realtime Messaging Server",
-                })
-            }
+            logger.error(context.error.message);
         });
         this.centrifuge.on("connected", (context) => {
             logger.info("Centrifugo connected");
             this.connected = true;
+            this.clearDisconnectedNotificationTimer();
             if (!this.userId) {
                 logger.error("no user ID found");
                 return;
@@ -86,6 +85,17 @@ export class GatewayManager {
         this.centrifuge.on("disconnected", (context) => {
             this.connected = false;
             logger.info("Centrifugo disconnected");
+            this.clearDisconnectedNotificationTimer();
+            if (this.isDisconnecting) return;
+
+            this.disconnectedNotificationTimer = setTimeout(() => {
+                this.disconnectedNotificationTimer = undefined;
+                if (this.connected || this.isDisconnecting) return;
+
+                toaster.error({
+                    title: "Echtzeitverbindung nicht erreichbar",
+                });
+            }, DISCONNECTED_NOTIFICATION_DELAY_MS);
         });
         this.centrifuge.connect();
     }
@@ -116,6 +126,14 @@ export class GatewayManager {
     }
 
     disconnect() {
+        this.isDisconnecting = true;
+        this.clearDisconnectedNotificationTimer();
         this.centrifuge.disconnect();
+    }
+
+    private clearDisconnectedNotificationTimer() {
+        if (this.disconnectedNotificationTimer === undefined) return;
+        clearTimeout(this.disconnectedNotificationTimer);
+        this.disconnectedNotificationTimer = undefined;
     }
 }
