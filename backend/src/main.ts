@@ -32,6 +32,7 @@ const {
     files: filesService,
     customEmoji: customEmojiService,
     crewnow: crewNowService,
+    crewnowPreferences: crewNowPreferencesService,
     tasks: tasksService,
     notifications: notificationsService,
 } = services;
@@ -76,6 +77,7 @@ const app = createApp({
     filesService,
     customEmojiService,
     crewNowService,
+    crewNowPreferencesService,
     realtimeModule: createRealtimeModule,
     generateRealtimeToken: generateCentrifugoToken,
 }).listen(3000);

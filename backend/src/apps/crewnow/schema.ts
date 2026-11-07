@@ -29,4 +29,11 @@ export const crewNowPostTag = sqliteTable('crewnow_post_tag', {
     uniqueIndex('crewnow_post_tag_pair_uidx').on(table.postId, table.taggedUserId),
 ]);
 
+export const crewNowPreference = sqliteTable('crewnow_preference', {
+    userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+    mirrorFrontPreview: integer('mirror_front_preview', { mode: 'boolean' }).notNull().default(true),
+    captureDelaySeconds: integer('capture_delay_seconds').notNull().default(1),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
 export type CrewNowPost = typeof crewNowPost.$inferSelect;

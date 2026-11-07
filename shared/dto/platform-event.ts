@@ -48,12 +48,25 @@ export const CustomEmojisChangedEventSchema = t.Object({
 });
 export type CustomEmojisChangedEvent = typeof CustomEmojisChangedEventSchema.static;
 
+/** Content-free invalidation for the signed-in user's CrewNow preferences. */
+export const CrewNowPreferencesChangedPayloadSchema = t.Object({});
+export type CrewNowPreferencesChangedPayload = typeof CrewNowPreferencesChangedPayloadSchema.static;
+
+export const CrewNowPreferencesChangedEventSchema = t.Object({
+    id: t.String(),
+    occurredAt: t.String(),
+    type: t.Literal('crewnow.preferences.changed'),
+    data: CrewNowPreferencesChangedPayloadSchema,
+});
+export type CrewNowPreferencesChangedEvent = typeof CrewNowPreferencesChangedEventSchema.static;
+
 /** Discriminated union of all platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
     DiscussionChangedEventSchema,
     NotificationSettingsChangedEventSchema,
     CustomEmojisChangedEventSchema,
+    CrewNowPreferencesChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;

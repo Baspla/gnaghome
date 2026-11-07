@@ -8,19 +8,22 @@
     import Moon from "@lucide/svelte/icons/moon";
     import Monitor from "@lucide/svelte/icons/monitor";
     import Bell from "@lucide/svelte/icons/bell";
+    import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
     import Users from "@lucide/svelte/icons/users";
     import Smile from "@lucide/svelte/icons/smile";
     import { api } from "$lib/api";
     import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
+    import CrewNowPreferences from "./CrewNowPreferences.svelte";
     import { getCustomEmojis, refreshCustomEmojis } from "$lib/custom-emoji-catalog.svelte";
 
     const user = $derived(page.data.user ?? null);
-    type SettingsSection = "profile" | "appearance" | "notifications";
+    type SettingsSection = "profile" | "appearance" | "notifications" | "preferences";
     const sections: { id: SettingsSection; label: string; icon: typeof UserRound }[] = [
         { id: "profile", label: "Profil", icon: UserRound },
         { id: "appearance", label: "Darstellung", icon: Palette },
         { id: "notifications", label: "Benachrichtigungen", icon: Bell },
+        { id: "preferences", label: "Präferenzen", icon: SlidersHorizontal },
     ];
     type AdminUser = { id: string; name: string; email: string; image: string | null };
     type AdminSection = "users" | "custom-emojis";
@@ -230,6 +233,8 @@
             </div>
         {:else if activeSection === "notifications"}
             <NotificationSettings />
+        {:else if activeSection === "preferences"}
+            <CrewNowPreferences />
         {:else if activeSection === "custom-emojis"}
             <section aria-labelledby="admin-custom-emojis-heading" class="flex flex-col gap-4">
                 <div>

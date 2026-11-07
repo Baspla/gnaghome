@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { onDestroy, tick } from 'svelte';
+    import { onDestroy, onMount, tick } from 'svelte';
     import { api } from '$lib/api';
     import Button from '$lib/components/Button.svelte';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import PersonTagPicker from './PersonTagPicker.svelte';
+    import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
 
     type Person = { id: string; name: string; image: string | null };
     type Props = {
@@ -16,6 +17,8 @@
         onSaved: (postId: string) => void;
     };
     type CameraFacing = 'environment' | 'user';
+    type Preferences = { mirrorFrontPreview: boolean; captureDelaySeconds: 1 | 2 | 3 | 5 };
+    const defaultPreferences: Preferences = { mirrorFrontPreview: true, captureDelaySeconds: 1 };
 
     let {
         mode,
@@ -30,6 +33,9 @@
     let currentStep = $state<'inactive' | 'preview' | 'captured'>('inactive');
     let cameraFacing = $state<CameraFacing>('environment');
     let isCapturing = $state(false);
+    let countdown = $state<number | null>(null);
+    let preferences = $state<Preferences>({ ...defaultPreferences });
+    let preferencesLoading = $state(true);
     let isSwitchingCamera = $state(false);
     let isSubmitting = $state(false);
     let errorMessage = $state<string | null>(null);
@@ -57,9 +63,36 @@
     let frameWaitTimeout: ReturnType<typeof setTimeout> | undefined;
     let cancelFrameWait: (() => void) | null = null;
     let isShowingBack = $state(true);
+    const gateway = getGatewayManager();
 
     const primaryPhoto = $derived(isShowingBack ? backPreviewUrl : frontPreviewUrl);
     const smallPhoto = $derived(isShowingBack ? frontPreviewUrl : backPreviewUrl);
+
+    async function loadPreferences() {
+        try {
+            const response = await api.crewnow.preferences.get();
+            if (!response.error && response.data) preferences = response.data;
+        } catch {
+            // Camera use remains available with the mirrored, one-second defaults.
+        } finally {
+            preferencesLoading = false;
+        }
+    }
+
+    function wait(milliseconds: number, run: number): Promise<boolean> {
+        return new Promise((resolve) => setTimeout(() => resolve(run === captureRun), milliseconds));
+    }
+
+    async function waitForSecondCapture(delay: Preferences['captureDelaySeconds'], run: number): Promise<boolean> {
+        if (delay === 1) return wait(1000, run);
+        for (let remaining = delay; remaining > 0; remaining--) {
+            if (run !== captureRun) return false;
+            countdown = remaining;
+            if (!await wait(1000, run)) return false;
+        }
+        countdown = null;
+        return run === captureRun;
+    }
 
     function stopCamera() {
         cameraRun++;
@@ -252,11 +285,11 @@
             if (run !== captureRun) return;
             if (currentStep !== 'preview') throw new Error(errorMessage ?? 'Die zweite Kamera konnte nicht gestartet werden.');
 
-            // Give camera switching a full second: iOS Safari can settle facing-mode changes late.
-            await new Promise((resolve) => setTimeout(resolve, 1000));
             if (!videoElement) throw new Error('Kameravorschau ist nicht verfügbar.');
             await waitForVideoFrame(videoElement);
             if (run !== captureRun) return;
+            const captureDelay = preferences.captureDelaySeconds;
+            if (!await waitForSecondCapture(captureDelay, run)) return;
 
             const second = await takePhoto();
             if (run !== captureRun) return;
@@ -282,6 +315,7 @@
             setPreviewUrls('', '');
             currentStep = 'inactive';
         } finally {
+            countdown = null;
             isCapturing = false;
         }
     }
@@ -465,6 +499,18 @@
         stopCamera();
         if (mode === 'create') void discardCurrentUploads();
     });
+
+    onMount(() => {
+        const unsubscribeEvent = gateway.onEvent((event) => {
+            if (event.type === 'crewnow.preferences.changed') void loadPreferences();
+        });
+        const unsubscribeConnected = gateway.onConnected(() => void loadPreferences());
+        void loadPreferences();
+        return () => {
+            unsubscribeEvent();
+            unsubscribeConnected();
+        };
+    });
     </script>
 
 <form onsubmit={submitPost} class="mx-auto flex w-full max-w-2xl flex-col gap-6">
@@ -473,7 +519,7 @@
             <section class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-6 text-center">
                 <h2 class="text-xl font-semibold text-surface-950-50">Ein neues CrewNow aufnehmen</h2>
                 <p class="mt-2 text-sm text-surface-600-400">Wir nehmen ein Bild mit der Rückkamera und eines mit der Frontkamera auf.</p>
-                <Button type="button" class="mt-5" onclick={() => void startCamera('environment')}>Kamera aktivieren</Button>
+                <Button type="button" class="mt-5" disabled={preferencesLoading} onclick={() => void startCamera('environment')}>{preferencesLoading ? 'Präferenzen werden geladen …' : 'Kamera aktivieren'}</Button>
             </section>
         {:else if currentStep === 'preview'}
             <section class="space-y-4 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
@@ -481,22 +527,31 @@
                     {#if firstCaptureFacing === 'environment'}
                         <img src={backPreviewUrl} alt="Rückkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
                         <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
-                            <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
+                            <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
                         </div>
                     {:else if firstCaptureFacing === 'user'}
-                        <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
+                        <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
                         <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
                             <img src={frontPreviewUrl} alt="Frontkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
                         </div>
                     {:else}
-                        <video bind:this={videoElement} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
+                    <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
+                    {/if}
+                    {#if countdown !== null}
+                        <div aria-hidden="true" class="absolute inset-0 z-10 flex items-center justify-center bg-surface-950/30">
+                            <span class="flex h-24 w-24 items-center justify-center rounded-full bg-primary-500 text-5xl font-bold tabular-nums text-primary-contrast-500 shadow-xl">{countdown}</span>
+                        </div>
                     {/if}
                 </div>
                 <div class="flex justify-center gap-3">
                     <Button type="button" variant="outlined" onclick={() => void switchCamera()} disabled={isCapturing || isSwitchingCamera}>{isSwitchingCamera ? 'Kamera wird gewechselt …' : 'Kamera wechseln'}</Button>
                     <Button type="button" onclick={() => void captureBoth()} disabled={isCapturing}>{isCapturing ? 'Aufnahme läuft …' : 'Aufnehmen'}</Button>
                 </div>
-                {#if isCapturing}<p class="text-center text-sm text-surface-600-400" role="status">Das zweite Bild wird aufgenommen …</p>{/if}
+                {#if isCapturing}
+                    <p class="text-center text-sm text-surface-600-400" role="status">
+                        {#if countdown !== null}Das zweite Bild wird in {countdown} …{:else}Das zweite Bild wird aufgenommen …{/if}
+                    </p>
+                {/if}
             </section>
         {:else}
             <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
