@@ -170,8 +170,8 @@
     }
 
     onMount(() => {
-        const unsubscribeEvent = gateway.onEvent((event) => {
-            if (event.type === 'notification-settings.changed') void refreshSettings();
+        const unsubscribeEvent = gateway.onEvent('notification-settings.changed', (event) => {
+            if (event.entityId === 'notification-settings') void refreshSettings();
         });
         const unsubscribeConnected = gateway.onConnected(() => void refreshSettings());
         void refreshSettings(true);

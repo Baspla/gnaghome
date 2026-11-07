@@ -1,14 +1,16 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
     import type { PageProps } from './$types';
     import { api } from '$lib/api';
+    import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import Button from '$lib/components/Button.svelte';
     import PostCard from '$lib/components/crewnow/PostCard.svelte';
     import Discussion from '$lib/components/Discussion.svelte';
     import { ChevronLeftIcon } from '@lucide/svelte';
 
     let { data }: PageProps = $props();
-    const post = $derived(data.post as {
+    type Post = {
         id: string;
         discussionId: string;
         commentCount: number;
@@ -20,10 +22,42 @@
         createdAt: string;
         updatedAt: string;
         canEdit: boolean;
-    });
+    };
+    let refreshedPost = $state<{ id: string; value: Post } | null>(null);
+    const post = $derived(refreshedPost && refreshedPost.id === data.post.id ? refreshedPost.value : data.post as Post);
+    const gateway = getGatewayManager();
     let deleting = $state(false);
     let showDeleteDialog = $state(false);
     let errorMessage = $state<string | null>(null);
+
+    async function refreshPost() {
+        try {
+            const response = await api.crewnow.posts({ id: post.id }).get();
+            if (!response.error && response.data) refreshedPost = { id: post.id, value: response.data as Post };
+        } catch {
+            // Keep the current view; a later route load or reconnect can recover it.
+        }
+    }
+
+    onMount(() => {
+        const unsubscribeConnected = gateway.onConnected(() => void refreshPost());
+        const unsubscribePost = gateway.onEvent('crewnow.post.changed', (event) => {
+            if (event.entityId !== post.id) return;
+            if (event.action === 'DELETED') {
+                void goto('/crewnow');
+                return;
+            }
+            void refreshPost();
+        });
+        const unsubscribeDiscussion = gateway.onEvent('discussion.changed', (event) => {
+            if (event.entityId === post.discussionId) void refreshPost();
+        });
+        return () => {
+            unsubscribePost();
+            unsubscribeDiscussion();
+            unsubscribeConnected();
+        };
+    });
 
     async function deletePost() {
         if (deleting) return;

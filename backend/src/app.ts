@@ -41,7 +41,7 @@ export type AppDependencies = {
     notificationsService: NotificationsServiceDependency;
     vapidPublicKey?: string;
     realtimeModule: typeof createRealtimeModule;
-    generateRealtimeToken: (user: import('better-auth').User, deviceId: string) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
+    generateRealtimeToken: (user: import('better-auth').User) => Promise<import('./lib/result').Result<string, import('./lib/result').InternalError>>;
 };
 
 export type AppServices = Pick<AppDependencies, 'userService'>;

@@ -158,7 +158,7 @@ export class DiscussionsService {
             }).returning();
             if (!row) return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
             await this.notifyNewMessage(discussionResult.value, authorUserId);
-            await this.publishChanged(discussionId);
+            await this.publishChanged(discussionId, 'CREATED');
             return ok({ ...row, author, canEdit: true });
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
@@ -220,7 +220,7 @@ export class DiscussionsService {
             const [author] = await this.db.select({ id: user.id, name: user.name, image: user.image })
                 .from(user).where(eq(user.id, authorUserId)).limit(1);
             if (!author) return err({ status: 404, code: 'NOT_FOUND', message: 'Benutzer nicht gefunden.' });
-            await this.publishChanged(row.discussionId);
+            await this.publishChanged(row.discussionId, 'UPDATED');
             return ok({ ...row, author, canEdit: true });
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
@@ -240,37 +240,44 @@ export class DiscussionsService {
             )).returning({ id: discussionMessage.id, discussionId: discussionMessage.discussionId });
             const row = deleted[0];
             if (!row) return err({ status: 404, code: 'NOT_FOUND', message: 'Kommentar nicht gefunden.' });
-            await this.publishChanged(row.discussionId);
+            await this.publishChanged(row.discussionId, 'DELETED');
             return ok(null);
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gelöscht werden.' });
         }
     }
 
-    private async publishChanged(discussionId: string): Promise<void> {
+    async publishActivityFeedChanged(action: ActivityFeedChangedEvent['action'] = 'UPDATED'): Promise<void> {
+        const event: ActivityFeedChangedEvent = {
+            id: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            type: 'activity-feed.changed',
+            action,
+            entityId: 'activity-feed',
+        };
+        try {
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) console.warn('Activity feed update broadcast failed', result.error.message);
+        } catch {
+            // The feed event prompts a visible feed to refetch; persisted data remains authoritative.
+        }
+    }
+
+    private async publishChanged(discussionId: string, action: DiscussionChangedEvent['action']): Promise<void> {
         const event: DiscussionChangedEvent = {
             id: randomUUID(),
             occurredAt: new Date().toISOString(),
             type: 'discussion.changed',
-            data: {},
+            action,
+            entityId: discussionId,
         };
-        const feedEvent: ActivityFeedChangedEvent = {
-            id: randomUUID(),
-            occurredAt: event.occurredAt,
-            type: 'activity-feed.changed',
-            data: {},
-        };
-        for (const [channel, payload] of [
-            [RealtimeChannels.DISCUSSIONS, event],
-            [RealtimeChannels.ACTIVITY_FEED, feedEvent],
-        ] as const) {
-            try {
-                const result = await this.broadcast([channel], payload);
-                if (!result.ok) console.warn('Discussion update broadcast failed', result.error.message);
-            } catch {
-                // Realtime is an invalidation only; the persisted message remains authoritative.
-            }
+        try {
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) console.warn('Discussion update broadcast failed', result.error.message);
+        } catch {
+            // The event describes the changed discussion; persisted messages remain authoritative.
         }
+        await this.publishActivityFeedChanged('UPDATED');
     }
 }
 

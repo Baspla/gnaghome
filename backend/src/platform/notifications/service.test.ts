@@ -38,7 +38,12 @@ describe('NotificationsService', () => {
 
     it('persists opt-in preferences and rejects unregistered topics', async () => {
         expect(await service.setPreference('user-1', 'crewnow.post.new', true)).toMatchObject({ ok: true });
-        expect(broadcast).toHaveBeenCalledWith(['user:user-1'], expect.objectContaining({ type: 'notification-settings.changed', data: {} }));
+        expect(broadcast).toHaveBeenCalledWith(['user:user-1'], expect.objectContaining({
+            type: 'notification-settings.changed',
+            occurredAt: expect.any(String),
+            action: 'UPDATED',
+            entityId: 'notification-settings',
+        }));
         const settings = await service.getSettings('user-1');
         expect(settings.ok).toBe(true);
         if (settings.ok) expect(settings.value.topics).toEqual(expect.arrayContaining([
@@ -75,7 +80,7 @@ describe('NotificationsService', () => {
         expect(settings.ok && settings.value.subscriptionsCount).toBe(1);
     });
 
-    it('removes all subscriptions belonging to one user and publishes settings invalidation', async () => {
+    it('removes all subscriptions belonging to one user and publishes a settings change event', async () => {
         await service.saveSubscription('user-1', {
             endpoint: 'https://fcm.googleapis.com/user-one-device',
             keys: { p256dh: 'public-key-one', auth: 'auth-secret-one' },
@@ -94,7 +99,9 @@ describe('NotificationsService', () => {
         expect(broadcast).toHaveBeenCalledTimes(1);
         expect(broadcast).toHaveBeenCalledWith(['user:user-1'], expect.objectContaining({
             type: 'notification-settings.changed',
-            data: {},
+            occurredAt: expect.any(String),
+            action: 'UPDATED',
+            entityId: 'notification-settings',
         }));
         const alice = await service.getSettings('user-1');
         const bob = await service.getSettings('user-2');

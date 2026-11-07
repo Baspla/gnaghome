@@ -120,8 +120,8 @@
     }
 
     onMount(() => {
-        const unsubscribeEvent = gateway.onEvent((event) => {
-            if (event.type === 'discussion.changed') void loadMessages();
+        const unsubscribeEvent = gateway.onEvent('discussion.changed', (event) => {
+            if (event.entityId === discussionId) void loadMessages();
         });
         const unsubscribeConnected = gateway.onConnected(() => void loadMessages());
         void loadMessages();

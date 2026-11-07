@@ -1,101 +1,63 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
-import { PlatformEventSchema, type ActivityFeedChangedEvent, type CustomEmojisChangedEvent, type CrewNowPreferencesChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
+import { PlatformEventSchema, type PlatformEvent } from './platform-event';
 import { isPlatformEvent } from './platform-event-validation';
 
-const app = new Elysia()
-    .post('/event', ({ body }) => body, { body: PlatformEventSchema });
+const app = new Elysia().post('/event', ({ body }) => body, { body: PlatformEventSchema });
 
 describe('PlatformEventSchema', () => {
-    it('rejects unknown events and malformed feed events', () => {
-        expect(isPlatformEvent({
-            id: 'event-2',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'made.up.event',
-            data: {},
-        })).toBe(false);
-        expect(isPlatformEvent({
-            id: 'event-4',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'activity-feed.changed',
-            data: { extra: true },
-        })).toBe(false);
-    });
+    const validEvent: PlatformEvent = {
+        id: 'event-1',
+        occurredAt: '2026-11-07T12:34:56.000Z',
+        type: 'discussion.changed',
+        action: 'CREATED',
+        entityId: 'discussion-1',
+    };
 
-    it('accepts an activity-feed invalidation event without carrying activity data', async () => {
-        const event: PlatformEvent = {
-            id: 'event-feed-1',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'activity-feed.changed',
-            data: {},
-        };
-        const feedEvent: ActivityFeedChangedEvent = {
-            id: 'event-feed-1',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'activity-feed.changed',
-            data: {},
-        };
-
-        expect(isPlatformEvent(feedEvent)).toBe(true);
-        expect(isPlatformEvent({ ...feedEvent, data: { title: 'private post' } })).toBe(false);
-        expect(isPlatformEvent({ ...feedEvent, type: 'activity-feed.deleted' })).toBe(false);
+    it('accepts events with routing context and no data payload', async () => {
+        expect(isPlatformEvent(validEvent)).toBe(true);
 
         const response = await app.handle(new Request('http://localhost/event', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(feedEvent),
+            body: JSON.stringify(validEvent),
         }));
         expect(response.status).toBe(200);
     });
 
-    it('accepts discussion invalidations and rejects malformed IDs or comment content', () => {
-        const event: DiscussionChangedEvent = {
-            id: 'event-discussion-1',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'discussion.changed',
-            data: {},
-        };
-
-        expect(isPlatformEvent(event)).toBe(true);
-        expect(isPlatformEvent({ ...event, data: { discussionId: 'private-id' } })).toBe(false);
-        expect(isPlatformEvent({ ...event, data: { body: 'private' } })).toBe(false);
-        expect(isPlatformEvent({ ...event, type: 'discussion.deleted' })).toBe(false);
+    it('rejects unknown event types, actions, and missing or empty routing fields', () => {
+        expect(isPlatformEvent({ ...validEvent, type: 'unknown.changed' })).toBe(false);
+        expect(isPlatformEvent({ ...validEvent, action: 'UPSERT' })).toBe(false);
+        expect(isPlatformEvent({ ...validEvent, id: '' })).toBe(false);
+        expect(isPlatformEvent({ ...validEvent, entityId: '' })).toBe(false);
+        expect(isPlatformEvent({ ...validEvent, occurredAt: 'not-a-timestamp' })).toBe(false);
+        const { action: _action, ...withoutAction } = validEvent;
+        expect(isPlatformEvent(withoutAction)).toBe(false);
+        const { occurredAt: _occurredAt, ...withoutOccurredAt } = validEvent;
+        expect(isPlatformEvent(withoutOccurredAt)).toBe(false);
     });
 
-    it('accepts notification-settings invalidations without private settings data', () => {
-        const event: NotificationSettingsChangedEvent = {
-            id: 'event-notifications-1',
-            occurredAt: '2026-10-28T12:00:00.000Z',
-            type: 'notification-settings.changed',
-            data: {},
-        };
-        expect(isPlatformEvent(event)).toBe(true);
-        expect(isPlatformEvent({ ...event, data: { endpoint: 'https://secret.example' } })).toBe(false);
-        expect(isPlatformEvent({ ...event, type: 'notification-settings.updated' })).toBe(false);
+    it('rejects all data fields including an empty object', () => {
+        expect(isPlatformEvent({ ...validEvent, data: {} })).toBe(false);
+        expect(isPlatformEvent({ ...validEvent, data: { title: 'private content' } })).toBe(false);
     });
 
-    it('accepts custom emoji invalidations without catalog contents', () => {
-        const event: CustomEmojisChangedEvent = {
-            id: 'event-custom-emojis-1',
-            occurredAt: '2026-11-02T12:00:00.000Z',
-            type: 'custom-emojis.changed',
-            data: {},
-        };
-        expect(isPlatformEvent(event)).toBe(true);
-        expect(isPlatformEvent({ ...event, data: { name: 'private-name' } })).toBe(false);
-        expect(isPlatformEvent({ ...event, type: 'custom-emojis.deleted' })).toBe(false);
-    });
+    it('accepts each supported event type and all three actions', () => {
+        const types = [
+            'activity-feed.changed',
+            'discussion.changed',
+            'notification-settings.changed',
+            'custom-emojis.changed',
+            'crewnow.preferences.changed',
+            'crewnow.post.changed',
+            'crewnow.timeline.changed',
+        ] as const;
+        const actions = ['CREATED', 'UPDATED', 'DELETED'] as const;
 
-    it('accepts CrewNow preference invalidations without preference data', () => {
-        const event: CrewNowPreferencesChangedEvent = {
-            id: 'event-crewnow-preferences-1',
-            occurredAt: '2026-11-02T12:00:00.000Z',
-            type: 'crewnow.preferences.changed',
-            data: {},
-        };
-        expect(isPlatformEvent(event)).toBe(true);
-        expect(isPlatformEvent({ ...event, data: { captureDelaySeconds: 5 } })).toBe(false);
-        expect(isPlatformEvent({ ...event, type: 'crewnow.preferences.updated' })).toBe(false);
+        for (const type of types) {
+            for (const action of actions) {
+                expect(isPlatformEvent({ ...validEvent, type, action })).toBe(true);
+            }
+        }
     });
-
 });

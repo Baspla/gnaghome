@@ -30,7 +30,7 @@ describe('CrewNowPreferencesService', () => {
         });
     });
 
-    it('persists preferences for only the requested user and publishes an invalidation', async () => {
+    it('persists preferences for only the requested user and publishes a singleton change event', async () => {
         const saved = await service.updatePreferences('user-1', {
             mirrorFrontPreview: false,
             captureDelaySeconds: 3,
@@ -48,8 +48,11 @@ describe('CrewNowPreferencesService', () => {
         });
         expect(broadcast).toHaveBeenCalledWith(['user:user-1'], expect.objectContaining({
             type: 'crewnow.preferences.changed',
-            data: {},
+            occurredAt: expect.any(String),
+            action: 'UPDATED',
+            entityId: 'preferences',
         }));
+        expect(broadcast.mock.calls[0]?.[1]).not.toHaveProperty('data');
     });
 
     it('rejects unsupported delays without changing the persisted preferences', async () => {

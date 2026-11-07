@@ -96,8 +96,8 @@
 
     onMount(() => {
         setPageTitle('Aktivitäten');
-        const unsubscribeEvent = gateway.onEvent((event) => {
-            if (event.type === 'activity-feed.changed') void loadActivities(false);
+        const unsubscribeEvent = gateway.onEvent('activity-feed.changed', (event) => {
+            if (event.entityId === 'activity-feed') void loadActivities(false);
         });
         const unsubscribeConnected = gateway.onConnected(() => {
             if (hasLoadedOnce) void loadActivities(false);

@@ -1,17 +1,23 @@
 import { page } from "$app/state";
 import { env } from "$env/dynamic/public";
 import { api } from "$lib/api";
-import type { PlatformEvent } from "$shared/dto/platform-event";
+import type { PlatformEvent } from "../../../../shared/dto/platform-event";
 import { RealtimeChannels } from "$shared/constants";
-import { isPlatformEvent } from "$shared/dto/platform-event-validation";
+import { isPlatformEvent } from "../../../../shared/dto/platform-event-validation";
 import { Centrifuge, type PublicationContext } from "centrifuge";
 import { createLogger } from "$lib/logger";
 import { toaster } from "$lib/toaster";
+import {
+    dispatchPlatformEvent,
+    isPlatformEventType,
+    registerPlatformEventHandler,
+    type PlatformEventHandler,
+    type PlatformEventHandlers,
+} from './event-handler-registry';
 
 const logger = createLogger("gateway");
 const DISCONNECTED_NOTIFICATION_DELAY_MS = 2000;
 
-type PlatformEventHandler = (event: PlatformEvent) => void;
 type ConnectionHandler = () => void;
 
 export class GatewayManager {
@@ -21,7 +27,7 @@ export class GatewayManager {
             return "";
         }
         const token = await api.gateway.token
-            .get({ query: { deviceId: "default" } })
+            .get()
             .then((res) => {
                 return res.data?.token;
             });
@@ -41,7 +47,7 @@ export class GatewayManager {
         ),
     );
 
-    private handlers = new Set<PlatformEventHandler>();
+    private handlers: PlatformEventHandlers = new Map();
     private connectionHandlers = new Set<ConnectionHandler>();
     private connected = false;
     private disconnectedNotificationTimer: ReturnType<typeof setTimeout> | undefined;
@@ -51,9 +57,12 @@ export class GatewayManager {
      * Register a handler for a specific event type.
      * Returns an unsubscribe function.
      */
-    onEvent(handler: PlatformEventHandler): () => void {
-        this.handlers.add(handler);
-        return () => this.handlers.delete(handler);
+    onEvent<TEventType extends PlatformEvent['type']>(
+        eventType: TEventType,
+        handler: PlatformEventHandler<TEventType>,
+    ): () => void {
+        if (!isPlatformEventType(eventType)) throw new Error(`Unsupported platform event type: ${eventType}`);
+        return registerPlatformEventHandler(this.handlers, eventType, handler as unknown as PlatformEventHandler);
     }
 
     /** Register a callback for initial connection and every successful reconnect. */
@@ -77,9 +86,7 @@ export class GatewayManager {
                 return;
             }
             this.subscribeToChannel(`user:${this.userId}`);
-            this.subscribeToChannel(RealtimeChannels.ACTIVITY_FEED);
-            this.subscribeToChannel(RealtimeChannels.DISCUSSIONS);
-            this.subscribeToChannel(RealtimeChannels.CUSTOM_EMOJIS);
+            this.subscribeToChannel(RealtimeChannels.PUBLIC);
             for (const handler of this.connectionHandlers) handler();
         });
         this.centrifuge.on("disconnected", (context) => {
@@ -122,7 +129,7 @@ export class GatewayManager {
 
     private handlePlatformEvent(event: PlatformEvent) {
         logger.debug("received platform event", { type: event.type, eventId: event.id });
-        for (const handler of this.handlers) handler(event);
+        dispatchPlatformEvent(this.handlers, event);
     }
 
     disconnect() {

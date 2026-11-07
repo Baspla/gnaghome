@@ -10,9 +10,7 @@ export const Modules = {
 } as const;
 
 export const RealtimeChannels = {
-    ACTIVITY_FEED: 'public:activity-feed',
-    DISCUSSIONS: 'public:discussions',
-    CUSTOM_EMOJIS: 'public:custom-emojis',
+    PUBLIC: 'public',
 } as const;
 
 export type ModuleId = typeof Modules[keyof typeof Modules]; 

@@ -12,8 +12,8 @@
 
     onMount(() => {
         void refreshCustomEmojis();
-        const unsubscribeEvents = manager.onEvent((event) => {
-            if (event.type === 'custom-emojis.changed') void refreshCustomEmojis();
+        const unsubscribeEvents = manager.onEvent('custom-emojis.changed', (event) => {
+            if (event.entityId === 'custom-emojis') void refreshCustomEmojis();
         });
         const unsubscribeConnected = manager.onConnected(() => void refreshCustomEmojis());
         manager.connect();

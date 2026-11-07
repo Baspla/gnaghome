@@ -114,7 +114,7 @@ describe('backend HTTP app', () => {
     it('retains authenticated Centrifugo token issuance', async () => {
         session = { user: sessionUser, session: { id: 'session-1' } };
         const response = await makeTestApp().handle(new Request(
-            'http://localhost/api/v1/gateway/token?deviceId=default',
+            'http://localhost/api/v1/gateway/token',
         ));
 
         expect(response.status).toBe(200);

@@ -1,72 +1,81 @@
 import { t } from 'elysia';
 
-/** Feed invalidation; clients must refetch persisted, permission-checked items. */
-export const ActivityFeedChangedPayloadSchema = t.Object({});
-export type ActivityFeedChangedPayload = typeof ActivityFeedChangedPayloadSchema.static;
+const EventBaseSchema = {
+    id: t.String({ minLength: 1 }),
+    occurredAt: t.String({ format: 'date-time' }),
+    action: t.Union([t.Literal('CREATED'), t.Literal('UPDATED'), t.Literal('DELETED')]),
+    entityId: t.String({ minLength: 1 }),
+    data: t.Optional(t.Never()),
+};
+
+export const PlatformEventActionSchema = t.Union([
+    t.Literal('CREATED'),
+    t.Literal('UPDATED'),
+    t.Literal('DELETED'),
+]);
+export type PlatformEventAction = typeof PlatformEventActionSchema.static;
 
 export const ActivityFeedChangedEventSchema = t.Object({
-    id: t.String(),
-    occurredAt: t.String(),
+    ...EventBaseSchema,
     type: t.Literal('activity-feed.changed'),
-    data: ActivityFeedChangedPayloadSchema,
 });
 export type ActivityFeedChangedEvent = typeof ActivityFeedChangedEventSchema.static;
 
-/** Content-free global invalidation; clients refetch through authorized discussion APIs. */
-export const DiscussionChangedPayloadSchema = t.Object({});
-export type DiscussionChangedPayload = typeof DiscussionChangedPayloadSchema.static;
-
 export const DiscussionChangedEventSchema = t.Object({
-    id: t.String(),
-    occurredAt: t.String(),
+    ...EventBaseSchema,
     type: t.Literal('discussion.changed'),
-    data: DiscussionChangedPayloadSchema,
 });
 export type DiscussionChangedEvent = typeof DiscussionChangedEventSchema.static;
 
-/** Content-free invalidation for the signed-in user's notification settings. */
-export const NotificationSettingsChangedPayloadSchema = t.Object({});
-export type NotificationSettingsChangedPayload = typeof NotificationSettingsChangedPayloadSchema.static;
-
 export const NotificationSettingsChangedEventSchema = t.Object({
-    id: t.String(),
-    occurredAt: t.String(),
+    ...EventBaseSchema,
     type: t.Literal('notification-settings.changed'),
-    data: NotificationSettingsChangedPayloadSchema,
 });
 export type NotificationSettingsChangedEvent = typeof NotificationSettingsChangedEventSchema.static;
 
-/** Global custom emoji catalogue invalidation; clients refetch its persisted contents. */
-export const CustomEmojisChangedPayloadSchema = t.Object({});
-export type CustomEmojisChangedPayload = typeof CustomEmojisChangedPayloadSchema.static;
-
 export const CustomEmojisChangedEventSchema = t.Object({
-    id: t.String(),
-    occurredAt: t.String(),
+    ...EventBaseSchema,
     type: t.Literal('custom-emojis.changed'),
-    data: CustomEmojisChangedPayloadSchema,
 });
 export type CustomEmojisChangedEvent = typeof CustomEmojisChangedEventSchema.static;
 
-/** Content-free invalidation for the signed-in user's CrewNow preferences. */
-export const CrewNowPreferencesChangedPayloadSchema = t.Object({});
-export type CrewNowPreferencesChangedPayload = typeof CrewNowPreferencesChangedPayloadSchema.static;
-
 export const CrewNowPreferencesChangedEventSchema = t.Object({
-    id: t.String(),
-    occurredAt: t.String(),
+    ...EventBaseSchema,
     type: t.Literal('crewnow.preferences.changed'),
-    data: CrewNowPreferencesChangedPayloadSchema,
 });
 export type CrewNowPreferencesChangedEvent = typeof CrewNowPreferencesChangedEventSchema.static;
 
-/** Discriminated union of all platform events sent through Centrifugo. */
+export const CrewNowPostChangedEventSchema = t.Object({
+    ...EventBaseSchema,
+    type: t.Literal('crewnow.post.changed'),
+});
+export type CrewNowPostChangedEvent = typeof CrewNowPostChangedEventSchema.static;
+
+export const CrewNowTimelineChangedEventSchema = t.Object({
+    ...EventBaseSchema,
+    type: t.Literal('crewnow.timeline.changed'),
+});
+export type CrewNowTimelineChangedEvent = typeof CrewNowTimelineChangedEventSchema.static;
+
+/** Discriminated union of thin, actionable platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
     DiscussionChangedEventSchema,
     NotificationSettingsChangedEventSchema,
     CustomEmojisChangedEventSchema,
     CrewNowPreferencesChangedEventSchema,
+    CrewNowPostChangedEventSchema,
+    CrewNowTimelineChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;
+
+export const PLATFORM_EVENT_TYPES = [
+    'activity-feed.changed',
+    'discussion.changed',
+    'notification-settings.changed',
+    'custom-emojis.changed',
+    'crewnow.preferences.changed',
+    'crewnow.post.changed',
+    'crewnow.timeline.changed',
+] as const satisfies readonly PlatformEvent['type'][];

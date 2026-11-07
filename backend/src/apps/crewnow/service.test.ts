@@ -26,6 +26,7 @@ describe('CrewNowService', () => {
     let notifyAll: ReturnType<typeof mock>;
     let notifyUsers: ReturnType<typeof mock>;
     let discussions: DiscussionsService;
+    let broadcast: ReturnType<typeof mock>;
 
     async function uploadImage(userId = 'user-1') {
         const result = await files.uploadFile(userId, PNG_BYTES);
@@ -41,9 +42,10 @@ describe('CrewNowService', () => {
         invalidateFeed = mock(async () => {});
         const activityFeed = { recordActivity, invalidateFeed } as unknown as ActivityFeedService;
         discussions = new DiscussionsService(database.db, async () => ok(null));
+        broadcast = mock(async () => ok(null));
         notifyAll = mock(async () => {});
         notifyUsers = mock(async () => {});
-        service = new CrewNowService(database.db, files, activityFeed, discussions, { notifyAll, notifyUsers });
+        service = new CrewNowService(database.db, files, activityFeed, discussions, { notifyAll, notifyUsers }, broadcast);
         await database.db.insert(user).values([
             { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
@@ -80,6 +82,12 @@ describe('CrewNowService', () => {
             },
         });
         expect(recordActivity).toHaveBeenCalledTimes(1);
+        expect(broadcast).toHaveBeenCalledWith(['public'], expect.objectContaining({
+            type: 'crewnow.post.changed',
+            occurredAt: expect.any(String),
+            action: 'CREATED',
+            entityId: 'post-1',
+        }));
         expect(recordActivity.mock.calls[0]?.[0]).toMatchObject({
             type: 'crewnow.image_posted',
             actorUserId: 'user-1',
@@ -199,6 +207,11 @@ describe('CrewNowService', () => {
         });
         expect(recordActivity).toHaveBeenCalledTimes(1);
         expect(invalidateFeed).toHaveBeenCalledTimes(1);
+        expect(broadcast).toHaveBeenCalledWith(['public'], expect.objectContaining({
+            type: 'crewnow.post.changed',
+            action: 'UPDATED',
+            entityId: 'post-edit',
+        }));
         expect(notifyAll).toHaveBeenCalledTimes(1);
         expect(notifyUsers).toHaveBeenCalledTimes(1);
     });
@@ -245,6 +258,11 @@ describe('CrewNowService', () => {
         expect(await files.getFile(backImageFileId, 'user-1')).toMatchObject({ ok: false });
         expect(await files.getFile(frontImageFileId, 'user-1')).toMatchObject({ ok: false });
         expect(invalidateFeed).toHaveBeenCalledTimes(1);
+        expect(broadcast).toHaveBeenCalledWith(['public'], expect.objectContaining({
+            type: 'crewnow.post.changed',
+            action: 'DELETED',
+            entityId: 'post-delete',
+        }));
         if (discussionId) expect(await discussions.getDiscussion(discussionId)).toMatchObject({ ok: false, error: { status: 404 } });
     });
 
