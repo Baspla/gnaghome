@@ -16,6 +16,9 @@ import type { FilesService } from '../../platform/files/service';
 import { user } from '../../platform/users/schema';
 import { crewNowPost, crewNowPostTag, type CrewNowPost } from './schema';
 import type { DiscussionsService } from '../../platform/discussions/service';
+import type { BroadcastPublisher } from '../../platform/realtime/service';
+import type { CrewNowPostChangedEvent, CrewNowTimelineChangedEvent } from '$shared/dto/platform-event';
+import { RealtimeChannels } from '$shared/constants';
 import type { NotificationsService } from '../../platform/notifications/service';
 
 export type CrewNowUserSummary = { id: string; name: string; image: string | null };
@@ -74,6 +77,7 @@ export class CrewNowService {
             notifyAll: async () => {},
             notifyUsers: async () => {},
         },
+        private readonly broadcast: BroadcastPublisher = async () => ({ ok: true, value: null }),
     ) {}
 
     private async getTaggedUsers(postId: string): Promise<CrewNowUserSummary[]> {
@@ -252,6 +256,8 @@ export class CrewNowService {
                 occurredAt: post.createdAt,
             });
             if (!recorded.ok) return err(recorded.error);
+            await this.publishPostChanged(post.id, 'CREATED');
+            await this.publishTimelineChanged('CREATED');
             await this.notifications.notifyAll('crewnow.post.new', [authorUserId, ...input.taggedUserIds], {
                 title: 'Neuer CrewNow',
                 body: 'Ein neuer CrewNow wurde geteilt.',
@@ -297,10 +303,11 @@ export class CrewNowService {
                     })));
                 }
             });
-            await this.activityFeed.invalidateFeed();
+            await this.activityFeed.invalidateFeed('UPDATED');
             const [updated] = await this.db.select().from(crewNowPost).where(eq(crewNowPost.id, postId)).limit(1);
             if (!updated) return err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
             const summary = await this.resolvePost(updated, authorUserId);
+            await this.publishPostChanged(postId, 'UPDATED');
             return summary ? ok(summary) : err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
         } catch (error) {
             console.error('CrewNow update failed', error);
@@ -322,11 +329,44 @@ export class CrewNowService {
                 await this.discussions.deleteDiscussion(post.discussionId);
             }
             await Promise.all([post.backImageFileId, post.frontImageFileId].map((fileId) => this.files.deleteFile(fileId)));
-            await this.activityFeed.invalidateFeed();
+            await this.activityFeed.invalidateFeed('DELETED');
+            await this.publishPostChanged(postId, 'DELETED');
             return ok(null);
         } catch (error) {
             console.error('CrewNow delete failed', error);
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Post konnte nicht gelöscht werden.' });
+        }
+    }
+
+    private async publishPostChanged(postId: string, action: CrewNowPostChangedEvent['action']): Promise<void> {
+        const event: CrewNowPostChangedEvent = {
+            id: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            type: 'crewnow.post.changed',
+            action,
+            entityId: postId,
+        };
+        try {
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) console.warn('CrewNow update broadcast failed', result.error.message);
+        } catch {
+            // The database is authoritative; connected clients recover through the API.
+        }
+    }
+
+    private async publishTimelineChanged(action: CrewNowTimelineChangedEvent['action']): Promise<void> {
+        const event: CrewNowTimelineChangedEvent = {
+            id: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            type: 'crewnow.timeline.changed',
+            action,
+            entityId: 'crewnow-timeline',
+        };
+        try {
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) console.warn('CrewNow timeline broadcast failed', result.error.message);
+        } catch {
+            // The database is authoritative; connected clients recover through the API.
         }
     }
 

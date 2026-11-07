@@ -80,7 +80,8 @@ export class CrewNowPreferencesService {
             id: randomUUID(),
             occurredAt: this.clock().toISOString(),
             type: 'crewnow.preferences.changed',
-            data: {},
+            action: 'UPDATED',
+            entityId: 'preferences',
         };
         try {
             const result = await this.broadcast([`user:${userId}`], event);

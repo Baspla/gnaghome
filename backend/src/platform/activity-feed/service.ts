@@ -221,23 +221,24 @@ export class ActivityFeedService {
     ) {}
 
     /** Ask connected clients to reload the durable feed without recording another activity. */
-    async invalidateFeed(): Promise<void> {
-        await this.publishChangedEvent();
+    async invalidateFeed(action: ActivityFeedChangedEvent['action'] = 'CREATED'): Promise<void> {
+        await this.publishChangedEvent(action);
     }
 
-    /** Publish the shared feed invalidation; callers should invoke after committing durable state. */
-    async publishChangedEvent(): Promise<void> {
+    /** Publish a feed collection change event after callers commit durable state. */
+    async publishChangedEvent(action: ActivityFeedChangedEvent['action'] = 'CREATED'): Promise<void> {
         const event: ActivityFeedChangedEvent = {
             id: crypto.randomUUID(),
             occurredAt: new Date().toISOString(),
             type: 'activity-feed.changed',
-            data: {},
+            action,
+            entityId: 'activity-feed',
         };
         try {
-            const result = await this.broadcast([RealtimeChannels.ACTIVITY_FEED], event);
-            if (!result.ok) logger.warn('activity feed invalidation failed', { message: result.error.message });
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) logger.warn('activity feed change event publication failed', { message: result.error.message });
         } catch (error) {
-            logger.warn('activity feed invalidation failed', { error: String(error) });
+            logger.warn('activity feed change event publication failed', { error: String(error) });
         }
     }
 

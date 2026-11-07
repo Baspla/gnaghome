@@ -77,9 +77,28 @@
         }
     }
 
+    async function refreshPost(postId: string, action: 'CREATED' | 'UPDATED' | 'DELETED') {
+        if (!posts.some((post) => post.id === postId)) return;
+        if (action === 'DELETED') {
+            posts = posts.filter((post) => post.id !== postId);
+            return;
+        }
+        try {
+            const response = await api.crewnow.posts({ id: postId }).get();
+            if (response.error || !response.data) return;
+            const updated = response.data as Post;
+            posts = posts.map((post) => post.id === postId ? updated : post);
+        } catch {
+            // The timeline remains usable; a later refresh will recover persisted state.
+        }
+    }
+
     onMount(() => {
-        const unsubscribeEvent = gateway.onEvent((event) => {
-            if (event.type === 'activity-feed.changed') void loadPage(false);
+        const unsubscribeTimeline = gateway.onEvent('crewnow.timeline.changed', (event) => {
+            if (event.entityId === 'crewnow-timeline') void loadPage(false);
+        });
+        const unsubscribePost = gateway.onEvent('crewnow.post.changed', (event) => {
+            void refreshPost(event.entityId, event.action);
         });
         const unsubscribeConnected = gateway.onConnected(() => {
             if (hasLoadedOnce) void loadPage(false);
@@ -93,7 +112,8 @@
         if (sentinel) observer.observe(sentinel);
         return () => {
             observer?.disconnect();
-            unsubscribeEvent();
+            unsubscribeTimeline();
+            unsubscribePost();
             unsubscribeConnected();
         };
     });

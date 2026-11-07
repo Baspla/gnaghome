@@ -3,16 +3,20 @@ import { createBroadcastPublisher, createCentrifugoPublisher, generateCentrifugo
 import * as jose from 'jose';
 import { env } from '../../env';
 import type { PlatformEvent } from '$shared/dto/platform-event';
+import { createRealtimeModule } from './index';
+import { createAuthMiddleware } from '../auth';
+import { Elysia } from 'elysia';
 
 const event: PlatformEvent = {
     id: 'event-1',
-    occurredAt: '2026-01-01T00:00:00.000Z',
+    occurredAt: '2026-11-07T12:34:56.000Z',
     type: 'activity-feed.changed',
-    data: {},
+    action: 'CREATED',
+    entityId: 'activity-feed',
 };
 
 describe('Centrifugo publisher', () => {
-    it('includes shared application realtime channels in authenticated tokens', async () => {
+    it('grants only the public and authenticated user channels', async () => {
         const user = {
             id: 'user-1',
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -22,15 +26,34 @@ describe('Centrifugo publisher', () => {
             emailVerified: true,
             image: null,
         };
-        const result = await generateCentrifugoToken(user, 'device-1');
+        const result = await generateCentrifugoToken(user);
         expect(result.ok).toBe(true);
         if (!result.ok) return;
 
         const payload = await jose.jwtVerify(result.value, new TextEncoder().encode(env.CENTRIFUGO_SECRET));
-        expect(payload.payload.channels).toContain('public:activity-feed');
-        expect(payload.payload.channels).toContain('public:discussions');
-        expect(payload.payload.channels).toContain('public:custom-emojis');
-        expect(payload.payload.channels).toContain('user:user-1');
+        expect(payload.payload.channels).toEqual(['public', 'user:user-1']);
+    });
+
+    it('issues a token from the authenticated gateway endpoint without a device ID', async () => {
+        const auth = createAuthMiddleware(
+            async () => ({
+                user: {
+                    id: 'user-1', createdAt: new Date(), updatedAt: new Date(), name: 'Test User',
+                    email: 'user@example.test', emailVerified: true, groups: '[]', image: null,
+                },
+                session: { id: 'session-1' },
+            }),
+            async () => new Response('auth'),
+        );
+        const generateToken = mock(async (_user: { id: string }) => ({ ok: true as const, value: 'test-token' }));
+        const response = await new Elysia()
+            .use(createRealtimeModule(auth, generateToken))
+            .handle(new Request('http://localhost/gateway/token'));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ token: 'test-token' });
+        expect(generateToken).toHaveBeenCalledTimes(1);
+        expect(generateToken.mock.calls[0]?.[0].id).toBe('user-1');
     });
 
     it('sends broadcast payloads with the configured API key', async () => {
@@ -48,7 +71,8 @@ describe('Centrifugo publisher', () => {
         expect(new Headers(init.headers).get('X-API-Key')).toBe('test-api-key');
         expect(requestBody).toEqual({ channels: ['user:one', 'user:two'], data: event });
         expect(requestBody.data.type).toBe('activity-feed.changed');
-        expect(requestBody.data.data).toEqual({});
+        expect(requestBody.data).toEqual(event);
+        expect(requestBody.data.occurredAt).toBe('2026-11-07T12:34:56.000Z');
     });
 
     it('returns a domain error for a non-success response', async () => {

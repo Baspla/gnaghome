@@ -24,7 +24,7 @@ export function createServices(
     const tasks = new TasksService(db);
     const files = new FilesService(db, new LocalFileStorage(filesDirectory));
     const customEmoji = new CustomEmojiService(db, files, broadcast);
-    const crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications);
+    const crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications, broadcast);
     const crewnowPreferences = new CrewNowPreferencesService(db, broadcast);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);

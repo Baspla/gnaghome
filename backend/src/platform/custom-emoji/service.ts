@@ -125,7 +125,7 @@ export class CustomEmojiService {
                 createdAt,
             }).returning();
             if (!record) throw new Error('Custom emoji insert returned no row');
-            await this.publishChanged();
+            await this.publishChanged('CREATED');
             return ok(toSummary(record, finalized.value, uploaderUserId, uploaderName));
         } catch (error) {
             await this.files.deleteFile(finalized.value.id);
@@ -154,7 +154,7 @@ export class CustomEmojiService {
                     error: fileDeletion.error.message,
                 });
             }
-            await this.publishChanged();
+            await this.publishChanged('DELETED');
             return ok(null);
         } catch (error) {
             logger.error('failed to delete custom emoji', { name, error: String(error) });
@@ -162,18 +162,19 @@ export class CustomEmojiService {
         }
     }
 
-    private async publishChanged(): Promise<void> {
+    private async publishChanged(action: CustomEmojisChangedEvent['action']): Promise<void> {
         const event: CustomEmojisChangedEvent = {
             id: randomUUID(),
             occurredAt: this.clock().toISOString(),
             type: 'custom-emojis.changed',
-            data: {},
+            action,
+            entityId: 'custom-emojis',
         };
         try {
-            const result = await this.broadcast([RealtimeChannels.CUSTOM_EMOJIS], event);
-            if (!result.ok) logger.warn('custom emoji invalidation failed', { message: result.error.message });
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) logger.warn('custom emoji catalog event publication failed', { message: result.error.message });
         } catch (error) {
-            logger.warn('custom emoji invalidation failed', { error: String(error) });
+            logger.warn('custom emoji catalog event publication failed', { error: String(error) });
         }
     }
 }

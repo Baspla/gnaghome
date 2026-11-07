@@ -269,11 +269,12 @@ export class NotificationsService {
             id: randomUUID(),
             occurredAt: this.clock().toISOString(),
             type: 'notification-settings.changed',
-            data: {},
+            action: 'UPDATED',
+            entityId: 'notification-settings',
         };
         try {
             const result = await this.broadcast([`user:${userId}`], event);
-            if (!result.ok) logger.warn('notification settings invalidation failed', { userId, error: result.error.message });
+            if (!result.ok) logger.warn('notification settings event publication failed', { userId, error: result.error.message });
         } catch {
             // The database remains authoritative; reconnecting clients refetch settings.
         }

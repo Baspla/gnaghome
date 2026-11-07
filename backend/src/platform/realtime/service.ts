@@ -9,25 +9,22 @@ import { ok, err, type Result, type InternalError } from '../../lib/result';
 const logger = createLogger('realtime');
 
 export type CentrifugoBroadcastPayload = {
-    channels: string[];
+    channels: RealtimeChannel[];
     data: PlatformEvent;
 };
 export type CentrifugoPublisher = (payload: CentrifugoBroadcastPayload) => Promise<Response>;
-export type BroadcastPublisher = (channels: string[], data: PlatformEvent) => Promise<Result<null, InternalError>>;
+export type RealtimeChannel = 'public' | `user:${string}`;
+export type BroadcastPublisher = (channels: RealtimeChannel[], data: PlatformEvent) => Promise<Result<null, InternalError>>;
 
-export async function generateCentrifugoToken(user: User, deviceId: string): Promise<Result<string, InternalError>> {
-    const channels = [
+export async function generateCentrifugoToken(user: User): Promise<Result<string, InternalError>> {
+    const channels: RealtimeChannel[] = [
+        RealtimeChannels.PUBLIC,
         `user:${user.id}`,
-        `device:${user.id}:${deviceId}`,
-        RealtimeChannels.ACTIVITY_FEED,
-        RealtimeChannels.DISCUSSIONS,
-        RealtimeChannels.CUSTOM_EMOJIS,
-        'presence',
     ];
     return generateCentrifugoTokenForChannels(user, channels);
 }
 
-async function generateCentrifugoTokenForChannels(user: User, channels: string[]): Promise<Result<string, InternalError>> {
+async function generateCentrifugoTokenForChannels(user: User, channels: RealtimeChannel[]): Promise<Result<string, InternalError>> {
     const payload = {
         'sub': user.id,
         'exp': Math.floor(Date.now() / 1000) + 120,

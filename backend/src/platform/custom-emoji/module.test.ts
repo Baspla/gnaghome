@@ -86,9 +86,15 @@ describe('custom emoji HTTP module', () => {
         ]);
         expect((await files.getFile(catalog.items[0]!.fileId, 'admin')).ok).toBe(true);
         expect(published).toEqual([{
-            channels: ['public:custom-emojis'],
-            data: expect.objectContaining({ type: 'custom-emojis.changed', data: {} }),
+            channels: ['public'],
+            data: expect.objectContaining({
+                type: 'custom-emojis.changed',
+                occurredAt: expect.any(String),
+                action: 'CREATED',
+                entityId: 'custom-emojis',
+            }),
         }]);
+        expect(published[0]?.data).not.toHaveProperty('data');
     });
 
     it('restricts custom emoji upload to administrators and validates names', async () => {

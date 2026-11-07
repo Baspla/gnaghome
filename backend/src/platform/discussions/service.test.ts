@@ -53,20 +53,27 @@ describe('DiscussionsService', () => {
         expect(await database.db.select().from(discussionMessage)).toHaveLength(0);
     });
 
-    it('persists comments and edited timestamps, and broadcasts only discussion invalidations', async () => {
+    it('persists comments and edited timestamps, and broadcasts thin entity-scoped events', async () => {
         const created = await service.createMessage(discussionId, 'user-1', 'Hallo zusammen');
         expect(created).toMatchObject({
             ok: true,
             value: { body: 'Hallo zusammen', author: { id: 'user-1', name: 'Alice' }, editedAt: null },
         });
         expect(broadcast).toHaveBeenCalledTimes(2);
-        expect(broadcast.mock.calls[0]?.[0]).toEqual(['public:discussions']);
+        expect(broadcast.mock.calls[0]?.[0]).toEqual(['public']);
         expect(broadcast.mock.calls[0]?.[1]).toMatchObject({
             type: 'discussion.changed',
-            data: {},
+            occurredAt: expect.any(String),
+            action: 'CREATED',
+            entityId: discussionId,
         });
-        expect(JSON.stringify(broadcast.mock.calls[0]?.[1])).not.toContain(discussionId);
+        expect(broadcast.mock.calls[0]?.[1]).not.toHaveProperty('data');
         expect(JSON.stringify(broadcast.mock.calls[0]?.[1])).not.toContain('Hallo zusammen');
+        expect(broadcast.mock.calls[1]?.[1]).toMatchObject({
+            type: 'activity-feed.changed',
+            action: 'UPDATED',
+            entityId: 'activity-feed',
+        });
 
         const edited = created.ok
             ? await service.editMessage(created.value.id, 'user-1', 'Aktualisierter Kommentar')
@@ -74,6 +81,8 @@ describe('DiscussionsService', () => {
         expect(edited).toMatchObject({ ok: true, value: { body: 'Aktualisierter Kommentar' } });
         if (edited.ok) expect(edited.value.editedAt).toBeInstanceOf(Date);
         expect(broadcast).toHaveBeenCalledTimes(4);
+        expect(broadcast.mock.calls[2]?.[1]).toMatchObject({ action: 'UPDATED', entityId: discussionId });
+        expect(broadcast.mock.calls[3]?.[1]).toMatchObject({ action: 'UPDATED', entityId: 'activity-feed' });
 
         const messages = await service.getMessages(discussionId, 'user-1');
         expect(messages).toMatchObject({ ok: true, value: [{ body: 'Aktualisierter Kommentar', editedAt: expect.any(Date) }] });

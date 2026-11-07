@@ -52,7 +52,7 @@ describe('ActivityFeedService', () => {
         expect(result.value.createdAt).toBeInstanceOf(Date);
     });
 
-    it('broadcasts only an invalidation after an activity is durably recorded', async () => {
+    it('publishes a thin public feed-change event after an activity is durably recorded', async () => {
         const result = await service.recordActivity({
             type: 'profile.updated',
             actorUserId: 'user-1',
@@ -63,11 +63,14 @@ describe('ActivityFeedService', () => {
 
         expect(result.ok).toBe(true);
         expect(broadcast).toHaveBeenCalledTimes(1);
-        expect(broadcast.mock.calls[0]?.[0]).toEqual(['public:activity-feed']);
+        expect(broadcast.mock.calls[0]?.[0]).toEqual(['public']);
         expect(broadcast.mock.calls[0]?.[1]).toMatchObject({
             type: 'activity-feed.changed',
-            data: {},
+            occurredAt: expect.any(String),
+            action: 'CREATED',
+            entityId: 'activity-feed',
         });
+        expect(broadcast.mock.calls[0]?.[1]).not.toHaveProperty('data');
         expect(JSON.stringify(broadcast.mock.calls[0]?.[1])).not.toContain('user-1');
     });
 

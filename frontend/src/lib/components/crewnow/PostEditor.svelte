@@ -501,8 +501,8 @@
     });
 
     onMount(() => {
-        const unsubscribeEvent = gateway.onEvent((event) => {
-            if (event.type === 'crewnow.preferences.changed') void loadPreferences();
+        const unsubscribeEvent = gateway.onEvent('crewnow.preferences.changed', (event) => {
+            if (event.entityId === 'preferences') void loadPreferences();
         });
         const unsubscribeConnected = gateway.onConnected(() => void loadPreferences());
         void loadPreferences();
