@@ -19,4 +19,10 @@ export const CREWNOW_NOTIFICATION_TOPICS: NotificationTopicInput[] = [
         label: 'Tägliche Erinnerung zum Posten',
         description: 'Ein zufälliger Hinweis zwischen 09:00 und 20:00 Uhr, falls du heute noch nichts gepostet hast.',
     },
+    {
+        id: 'crewnow.post.reaction',
+        appId: 'crewnow',
+        label: 'Reaktion auf meinen CrewNow',
+        description: 'Wenn jemand auf einen deiner CrewNows reagiert.',
+    },
 ];

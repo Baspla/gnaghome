@@ -10,6 +10,7 @@ import { ActivityFeedService } from './service';
 import { createActivityFeedModule } from './module';
 import type { CrewNowService } from '../../apps/crewnow/service';
 import { DiscussionsService } from '../discussions/service';
+import { ReactionsService } from '../reactions/service';
 
 describe('activity feed HTTP module', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
@@ -19,6 +20,7 @@ describe('activity feed HTTP module', () => {
     let currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
     let postExists = true;
     let discussions: DiscussionsService;
+    let reactions: ReactionsService;
     let discussionId = '';
 
     const getUserAsUser: UserService['getUserAsUser'] = async (viewerId, targetUserId) => {
@@ -44,7 +46,7 @@ describe('activity feed HTTP module', () => {
         };
         return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }, crewNowService, {
             getMessageCounts: (ids) => discussions.getMessageCounts(ids),
-        }));
+        }, reactions));
     }
 
     beforeEach(async () => {
@@ -57,6 +59,7 @@ describe('activity feed HTTP module', () => {
         ]);
         service = new ActivityFeedService(database.db, async () => ok(null));
         discussions = new DiscussionsService(database.db, async () => ok(null));
+        reactions = new ReactionsService(database.db);
         const createdDiscussion = await discussions.getOrCreateDiscussion('crewnow.post', 'post-1');
         if (!createdDiscussion.ok) throw new Error('discussion setup failed');
         discussionId = createdDiscussion.value.id;
@@ -88,6 +91,8 @@ describe('activity feed HTTP module', () => {
     });
 
     it('returns authorized profile and CrewNow activities with public actor and live tagged users', async () => {
+        await reactions.toggleReaction('crewnow.post', 'post-1', 'actor-1', '❤️');
+        await reactions.toggleReaction('crewnow.post', 'post-1', 'subject-1', '🔥');
         await discussions.createMessage(discussionId, 'actor-1', 'Kommentar eins');
         await discussions.createMessage(discussionId, 'subject-1', 'Kommentar zwei');
         await discussions.createMessage(discussionId, 'viewer-1', 'Kommentar drei');
@@ -127,6 +132,7 @@ describe('activity feed HTTP module', () => {
                 data: { imageFileId: 'file-1', taggedUsers: [{ id: 'tag-1', name: 'Tag One', image: null }] },
                 discussionId,
                 commentCount: 3,
+                reactionCount: 2,
             }, {
                 type: 'profile.updated',
                 actor: { id: 'actor-1', name: 'Alice', image: 'https://example.test/alice.png' },

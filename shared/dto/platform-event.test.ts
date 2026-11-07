@@ -46,6 +46,7 @@ describe('PlatformEventSchema', () => {
         const types = [
             'activity-feed.changed',
             'discussion.changed',
+            'reaction.changed',
             'notification-settings.changed',
             'custom-emojis.changed',
             'crewnow.preferences.changed',

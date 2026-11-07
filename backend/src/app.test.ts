@@ -39,7 +39,14 @@ function makeTestApp() {
         activityFeedService: { getFeed: getActivityFeed },
         discussionsService: {} as AppDependencies['discussionsService'],
         discussionsFeedService: { getMessageCounts: async () => ({}) },
+        reactionsService: {
+            getReactions: async () => ok({ count: 0, viewerReaction: null, items: [] }),
+            toggleReaction: async () => ok({ changed: true, reaction: { emoji: '❤️' } }),
+            getCounts: async () => ({}),
+        },
         canViewDiscussionTarget: async (viewerUserId, targetType, targetId) =>
+            viewerUserId === 'user-1' && targetType === 'crewnow.post' && targetId === 'test-post-id',
+        canViewReactionTarget: async (viewerUserId, targetType, targetId) =>
             viewerUserId === 'user-1' && targetType === 'crewnow.post' && targetId === 'test-post-id',
         notificationsService: {
             getSettings: async () => ok({ topics: [], subscriptionsCount: 0 }),

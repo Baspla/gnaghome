@@ -6,7 +6,7 @@
     import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
-    import { ChevronRight, MessageCircle } from '@lucide/svelte';
+    import { ChevronRight, Heart, MessageCircle } from '@lucide/svelte';
     import { setPageTitle } from '$lib/utils';
 
     type Activity = {
@@ -17,6 +17,7 @@
         target: { type: string; id: string } | null;
         discussionId: string | null;
         commentCount: number;
+        reactionCount: number;
         data: { changedFields?: Array<'name' | 'image'>; imageFileId?: string; taggedUsers?: Array<{ id: string; name: string; image: string | null }> };
         occurredAt: string;
     };
@@ -99,6 +100,19 @@
         const unsubscribeEvent = gateway.onEvent('activity-feed.changed', (event) => {
             if (event.entityId === 'activity-feed') void loadActivities(false);
         });
+        const unsubscribeReaction = gateway.onEvent('reaction.changed', (event) => {
+            const separator = event.entityId.indexOf(':');
+            if (separator < 0 || event.entityId.slice(0, separator) !== 'crewnow.post') return;
+            let postId: string;
+            try {
+                postId = decodeURIComponent(event.entityId.slice(separator + 1));
+            } catch {
+                return;
+            }
+            if (activities.some((activity) => activity.target?.type === 'crewnow.post' && activity.target.id === postId)) {
+                void loadActivities(false);
+            }
+        });
         const unsubscribeConnected = gateway.onConnected(() => {
             if (hasLoadedOnce) void loadActivities(false);
         });
@@ -106,6 +120,7 @@
 
         return () => {
             unsubscribeEvent();
+            unsubscribeReaction();
             unsubscribeConnected();
         };
     });
@@ -209,6 +224,10 @@
                                     {#if activity.discussionId}
                                         <MessageCircle class="h-4 w-4" aria-hidden="true" />
                                         <span>{activity.commentCount}</span>
+                                    {/if}
+                                    {#if activity.target?.type === 'crewnow.post'}
+                                        <Heart class="ml-2 h-4 w-4" aria-hidden="true" />
+                                        <span>{activity.reactionCount}</span>
                                     {/if}
                                     <ChevronRight class="h-4 w-4" aria-hidden="true" />
                                 </a>

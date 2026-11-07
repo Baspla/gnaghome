@@ -11,6 +11,7 @@ import { createCrewNowModule } from './apps/crewnow/module';
 import { createDiscussionsModule } from './platform/discussions/module';
 import { createNotificationsModule } from './platform/notifications/module';
 import { createCustomEmojiModule } from './platform/custom-emoji/module';
+import { createReactionsModule } from './platform/reactions/module';
 
 const logger = createLogger('app');
 
@@ -24,6 +25,7 @@ type DiscussionsServiceDependency = Pick<import('./platform/discussions/service'
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
 type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
 type NotificationsServiceDependency = Pick<import('./platform/notifications/service').NotificationsService, 'getSettings' | 'setPreference' | 'saveSubscription' | 'removeSubscription' | 'removeAllSubscriptions'>;
+type ReactionsServiceDependency = Pick<import('./platform/reactions/service').ReactionsService, 'getReactions' | 'toggleReaction' | 'getCounts'>;
 
 export type AppDependencies = {
     getSession: SessionResolver;
@@ -37,7 +39,9 @@ export type AppDependencies = {
     crewNowPreferencesService: CrewNowPreferencesServiceDependency;
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
+    reactionsService: ReactionsServiceDependency;
     canViewDiscussionTarget: DiscussionTargetAuthorizer;
+    canViewReactionTarget: DiscussionTargetAuthorizer;
     notificationsService: NotificationsServiceDependency;
     vapidPublicKey?: string;
     realtimeModule: typeof createRealtimeModule;
@@ -88,8 +92,9 @@ export function createApp(dependencies: AppDependencies) {
                         .get('/health', () => ({ status: 'ok' }))
                         .get('/status', () => ({ status: 'online' }))
                         .use(createUserModule(authMiddleware, dependencies.userService))
-                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService))
+                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService, dependencies.reactionsService))
                         .use(createDiscussionsModule(authMiddleware, dependencies.discussionsService, dependencies.canViewDiscussionTarget))
+                        .use(createReactionsModule(authMiddleware, dependencies.reactionsService, dependencies.canViewReactionTarget))
                         .use(createNotificationsModule(authMiddleware, dependencies.notificationsService, dependencies.vapidPublicKey))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCustomEmojiModule(authMiddleware, dependencies.customEmojiService))

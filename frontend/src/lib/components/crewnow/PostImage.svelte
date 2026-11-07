@@ -1,9 +1,13 @@
 <script lang="ts">
     import InlineText from '$lib/components/InlineText.svelte';
+    import PostReactions from './PostReactions.svelte';
     type Props = {
         backImageUrl: string;
         frontImageUrl: string;
         caption?: string | null;
+        postId: string;
+        reactionCount: number;
+        onReactionCountChange: (count: number) => void;
         alt?: string;
         class?: string;
     };
@@ -12,6 +16,9 @@
         backImageUrl,
         frontImageUrl,
         caption = null,
+        postId,
+        reactionCount,
+        onReactionCountChange,
         alt = 'CrewNow-Foto',
         class: className,
     }: Props = $props();
@@ -72,6 +79,9 @@
                 <img src={overlayImage} alt="Vorderkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
             </button>
         {/if}
+        <div class="absolute bottom-3 right-3 z-10">
+            <PostReactions {postId} count={reactionCount} onCountChange={onReactionCountChange} />
+        </div>
     </div>
     {#if caption}
         <figcaption class="mt-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200"><InlineText text={caption} /></figcaption>

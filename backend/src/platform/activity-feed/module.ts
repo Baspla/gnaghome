@@ -5,17 +5,25 @@ import type { createAuthMiddleware } from '../auth';
 import type { ActivityFeedService, ActivityFeedRecord } from './service';
 import type { CrewNowService } from '../../apps/crewnow/service';
 import type { DiscussionsService } from '../discussions/service';
+import type { ReactionsService } from '../reactions/service';
 
 type ActivityFeedUserService = Pick<UserService, 'getUserAsUser'>;
 type ActivityFeedServiceDependency = Pick<ActivityFeedService, 'getFeed'>;
 type ActivityFeedCrewNowService = Pick<CrewNowService, 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 type ActivityFeedDiscussionsService = Pick<DiscussionsService, 'getMessageCounts'>;
+type ActivityFeedReactionsService = Pick<ReactionsService, 'getCounts'>;
 
 function toPublicUser(user: { id: string; name: string; image: string | null } | null) {
     return user ? { id: user.id, name: user.name, image: user.image } : null;
 }
 
-function toActivitySummary(activity: ActivityFeedRecord, actor: ReturnType<typeof toPublicUser>, subject: ReturnType<typeof toPublicUser>, commentCount = 0) {
+function toActivitySummary(
+    activity: ActivityFeedRecord,
+    actor: ReturnType<typeof toPublicUser>,
+    subject: ReturnType<typeof toPublicUser>,
+    commentCount = 0,
+    reactionCount = 0,
+) {
     return {
         id: activity.id,
         type: activity.type,
@@ -26,6 +34,7 @@ function toActivitySummary(activity: ActivityFeedRecord, actor: ReturnType<typeo
             : null,
         discussionId: activity.discussionId,
         commentCount,
+        reactionCount,
         data: activity.data,
         occurredAt: activity.occurredAt.toISOString(),
     };
@@ -37,6 +46,7 @@ export function createActivityFeedModule(
     userService: ActivityFeedUserService,
     crewNowService?: ActivityFeedCrewNowService,
     discussionsService?: ActivityFeedDiscussionsService,
+    reactionsService?: ActivityFeedReactionsService,
 ) {
     return new Elysia({ prefix: '/activity-feed', name: Modules.ACTIVITY_FEED })
         .use(authMiddleware)
@@ -93,12 +103,16 @@ export function createActivityFeedModule(
                     const commentCount = activity.discussionId && discussionsService
                         ? (await discussionsService.getMessageCounts([activity.discussionId]))[activity.discussionId] ?? 0
                         : 0;
+                    const reactionCount = reactionsService
+                        ? (await reactionsService.getCounts('crewnow.post', [activity.targetId]))[activity.targetId] ?? 0
+                        : 0;
                     items.push({
                         ...toActivitySummary(
                             activity,
                             actorResult?.ok ? toPublicUser(actorResult.value) : null,
                             null,
                             commentCount,
+                            reactionCount,
                         ),
                         data: Object.assign({}, activity.data, {
                             taggedUsers: await crewNowService.getActivityTaggedUsers(

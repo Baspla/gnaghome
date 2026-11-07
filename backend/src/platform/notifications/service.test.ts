@@ -33,6 +33,7 @@ describe('NotificationsService', () => {
         expect(settings.value.topics).toEqual(expect.arrayContaining([
             expect.objectContaining({ id: 'crewnow.post.new', appId: 'crewnow', enabled: false }),
             expect.objectContaining({ id: 'discussions.post-comment', appId: 'discussions', enabled: false }),
+            expect.objectContaining({ id: 'crewnow.post.reaction', appId: 'crewnow', enabled: false }),
         ]));
     });
 

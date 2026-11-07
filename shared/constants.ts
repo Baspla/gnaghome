@@ -4,6 +4,7 @@ export const Modules = {
     REALTIME: 'realtime',
     ACTIVITY_FEED: 'activity-feed',
     DISCUSSIONS: 'discussions',
+    REACTIONS: 'reactions',
     FILES: 'files',
     CUSTOM_EMOJI: 'custom-emoji',
     NOTIFICATIONS: 'notifications',

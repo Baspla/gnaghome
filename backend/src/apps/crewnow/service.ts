@@ -20,6 +20,7 @@ import type { BroadcastPublisher } from '../../platform/realtime/service';
 import type { CrewNowPostChangedEvent, CrewNowTimelineChangedEvent } from '$shared/dto/platform-event';
 import { RealtimeChannels } from '$shared/constants';
 import type { NotificationsService } from '../../platform/notifications/service';
+import type { ReactionsService } from '../../platform/reactions/service';
 
 export type CrewNowUserSummary = { id: string; name: string; image: string | null };
 
@@ -27,6 +28,7 @@ export type CrewNowPostSummary = {
     id: string;
     discussionId: string | null;
     commentCount: number;
+    reactionCount: number;
     author: CrewNowUserSummary;
     backImage: { id: string; url: string };
     frontImage: { id: string; url: string };
@@ -78,6 +80,7 @@ export class CrewNowService {
             notifyUsers: async () => {},
         },
         private readonly broadcast: BroadcastPublisher = async () => ({ ok: true, value: null }),
+        private readonly reactions?: Pick<ReactionsService, 'getCounts' | 'deleteTargetReactions'>,
     ) {}
 
     private async getTaggedUsers(postId: string): Promise<CrewNowUserSummary[]> {
@@ -93,7 +96,7 @@ export class CrewNowService {
         return rows;
     }
 
-    private async resolvePost(post: CrewNowPost, viewerUserId: string, commentCount?: number): Promise<CrewNowPostSummary | null> {
+    private async resolvePost(post: CrewNowPost, viewerUserId: string, commentCount?: number, reactionCount?: number): Promise<CrewNowPostSummary | null> {
         const [author] = await this.db.select({ id: user.id, name: user.name, image: user.image })
             .from(user)
             .where(eq(user.id, post.authorUserId))
@@ -102,10 +105,14 @@ export class CrewNowService {
         const commentCounts = commentCount !== undefined ? null : post.discussionId
             ? await this.discussions.getMessageCounts([post.discussionId])
             : {};
+        const reactionCounts = reactionCount === undefined && this.reactions
+            ? await this.reactions.getCounts('crewnow.post', [post.id])
+            : {};
         return {
             id: post.id,
             discussionId: post.discussionId,
             commentCount: commentCount ?? (post.discussionId && commentCounts ? commentCounts[post.discussionId] ?? 0 : 0),
+            reactionCount: reactionCount ?? reactionCounts[post.id] ?? 0,
             author,
             backImage: { id: post.backImageFileId, url: `/api/v1/files/${post.backImageFileId}` },
             frontImage: { id: post.frontImageFileId, url: `/api/v1/files/${post.frontImageFileId}` },
@@ -325,6 +332,7 @@ export class CrewNowService {
             await this.db.transaction(async (tx) => {
                 await tx.delete(crewNowPost).where(eq(crewNowPost.id, postId));
             });
+            await this.reactions?.deleteTargetReactions('crewnow.post', postId);
             if (post.discussionId) {
                 await this.discussions.deleteDiscussion(post.discussionId);
             }
@@ -420,10 +428,12 @@ export class CrewNowService {
             const pageRows = rows.slice(0, limit);
             const discussionIds = pageRows.flatMap((post) => post.discussionId ? [post.discussionId] : []);
             const commentCounts = await this.discussions.getMessageCounts(discussionIds);
+            const reactionCounts = this.reactions ? await this.reactions.getCounts('crewnow.post', pageRows.map((post) => post.id)) : {};
             const items = (await Promise.all(pageRows.map((post) => this.resolvePost(
                 post,
                 viewerUserId,
                 post.discussionId ? commentCounts[post.discussionId] ?? 0 : 0,
+                reactionCounts[post.id] ?? 0,
             )))).filter((post): post is CrewNowPostSummary => post !== null);
             const last = pageRows[pageRows.length - 1];
             return ok({

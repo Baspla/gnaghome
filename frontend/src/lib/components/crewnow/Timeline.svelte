@@ -10,6 +10,7 @@
         id: string;
         discussionId: string | null;
         commentCount: number;
+        reactionCount: number;
         author: Person;
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -100,6 +101,17 @@
         const unsubscribePost = gateway.onEvent('crewnow.post.changed', (event) => {
             void refreshPost(event.entityId, event.action);
         });
+        const unsubscribeReaction = gateway.onEvent('reaction.changed', (event) => {
+            const separator = event.entityId.indexOf(':');
+            if (separator < 0 || event.entityId.slice(0, separator) !== 'crewnow.post') return;
+            let postId: string;
+            try {
+                postId = decodeURIComponent(event.entityId.slice(separator + 1));
+            } catch {
+                return;
+            }
+            void refreshPost(postId, 'UPDATED');
+        });
         const unsubscribeConnected = gateway.onConnected(() => {
             if (hasLoadedOnce) void loadPage(false);
         });
@@ -114,6 +126,7 @@
             observer?.disconnect();
             unsubscribeTimeline();
             unsubscribePost();
+            unsubscribeReaction();
             unsubscribeConnected();
         };
     });

@@ -64,6 +64,13 @@
       "when": 1794014568156,
       "tag": "0008_mean_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794080614134,
+      "tag": "0009_glossy_ricochet",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@
         id: string;
         discussionId: string;
         commentCount: number;
+        reactionCount: number;
         author: { id: string; name: string; image: string | null };
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -52,9 +53,13 @@
         const unsubscribeDiscussion = gateway.onEvent('discussion.changed', (event) => {
             if (event.entityId === post.discussionId) void refreshPost();
         });
+        const unsubscribeReaction = gateway.onEvent('reaction.changed', (event) => {
+            if (event.entityId === `crewnow.post:${encodeURIComponent(post.id)}`) void refreshPost();
+        });
         return () => {
             unsubscribePost();
             unsubscribeDiscussion();
+            unsubscribeReaction();
             unsubscribeConnected();
         };
     });
