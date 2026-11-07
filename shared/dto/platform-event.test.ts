@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
-import { PlatformEventSchema, type ActivityFeedChangedEvent, type CustomEmojisChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
+import { PlatformEventSchema, type ActivityFeedChangedEvent, type CustomEmojisChangedEvent, type CrewNowPreferencesChangedEvent, type DiscussionChangedEvent, type NotificationSettingsChangedEvent, type PlatformEvent } from './platform-event';
 import { isPlatformEvent } from './platform-event-validation';
 
 const app = new Elysia()
@@ -84,6 +84,18 @@ describe('PlatformEventSchema', () => {
         expect(isPlatformEvent(event)).toBe(true);
         expect(isPlatformEvent({ ...event, data: { name: 'private-name' } })).toBe(false);
         expect(isPlatformEvent({ ...event, type: 'custom-emojis.deleted' })).toBe(false);
+    });
+
+    it('accepts CrewNow preference invalidations without preference data', () => {
+        const event: CrewNowPreferencesChangedEvent = {
+            id: 'event-crewnow-preferences-1',
+            occurredAt: '2026-11-02T12:00:00.000Z',
+            type: 'crewnow.preferences.changed',
+            data: {},
+        };
+        expect(isPlatformEvent(event)).toBe(true);
+        expect(isPlatformEvent({ ...event, data: { captureDelaySeconds: 5 } })).toBe(false);
+        expect(isPlatformEvent({ ...event, type: 'crewnow.preferences.updated' })).toBe(false);
     });
 
 });

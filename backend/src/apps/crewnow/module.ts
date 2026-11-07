@@ -1,8 +1,10 @@
 import { Elysia, t } from 'elysia';
 import type { createAuthMiddleware } from '../../platform/auth';
 import type { CrewNowService } from './service';
+import type { CrewNowPreferencesService } from './preferences';
 
 type Service = Pick<CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers'>;
+type PreferencesService = Pick<CrewNowPreferencesService, 'getPreferences' | 'updatePreferences'>;
 
 function cursorDate(value?: string) {
     if (!value) return undefined;
@@ -10,9 +12,29 @@ function cursorDate(value?: string) {
     return Number.isFinite(createdAt.getTime()) ? createdAt : null;
 }
 
-export function createCrewNowModule(authMiddleware: ReturnType<typeof createAuthMiddleware>, service: Service) {
+export function createCrewNowModule(
+    authMiddleware: ReturnType<typeof createAuthMiddleware>,
+    service: Service,
+    preferencesService: PreferencesService,
+) {
     return new Elysia({ prefix: '/crewnow', name: 'crewnow' })
         .use(authMiddleware)
+        .get('/preferences', async ({ user, status }) => {
+            const result = await preferencesService.getPreferences(user.id);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return result.value;
+        }, { auth: true })
+        .put('/preferences', async ({ user, body, status }) => {
+            const result = await preferencesService.updatePreferences(user.id, body);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return result.value;
+        }, {
+            body: t.Object({
+                mirrorFrontPreview: t.Boolean(),
+                captureDelaySeconds: t.Union([t.Literal(1), t.Literal(2), t.Literal(3), t.Literal(5)]),
+            }),
+            auth: true,
+        })
         .get('/users', async ({ query, status, user }) => {
             const result = await service.searchUsers(query.q ?? '', query.limit ?? 20, user.id);
             if (!result.ok) return status(result.error.status, { error: result.error });

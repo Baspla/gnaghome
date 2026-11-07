@@ -57,6 +57,13 @@
       "when": 1793581680930,
       "tag": "0007_damp_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794014568156,
+      "tag": "0008_mean_tigra",
+      "breakpoints": true
     }
   ]
 }

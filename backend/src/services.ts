@@ -4,6 +4,7 @@ import { ActivityFeedService } from './platform/activity-feed';
 import { FilesService, LocalFileStorage } from './platform/files';
 import type { BroadcastPublisher } from './platform/realtime/service';
 import { CrewNowService } from './apps/crewnow/service';
+import { CrewNowPreferencesService } from './apps/crewnow/preferences';
 import { DiscussionsService } from './platform/discussions/service';
 import { TasksService } from './platform/tasks';
 import { NotificationsService } from './platform/notifications/service';
@@ -24,8 +25,9 @@ export function createServices(
     const files = new FilesService(db, new LocalFileStorage(filesDirectory));
     const customEmoji = new CustomEmojiService(db, files, broadcast);
     const crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications);
+    const crewnowPreferences = new CrewNowPreferencesService(db, broadcast);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);
 
-    return { users, activityFeed, discussions, files, customEmoji, crewnow, tasks, notifications };
+    return { users, activityFeed, discussions, files, customEmoji, crewnow, crewnowPreferences, tasks, notifications };
 }

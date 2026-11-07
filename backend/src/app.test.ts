@@ -70,6 +70,13 @@ function makeTestApp() {
             getActivityTaggedUsers: async (_viewerUserId: string, ids: string[]) => ids.map((id) => ({ id, name: id, image: null })),
             getTagIdsForPost: async () => [],
         },
+        crewNowPreferencesService: {
+            getPreferences: async () => ok({ mirrorFrontPreview: true, captureDelaySeconds: 1 }),
+            updatePreferences: async (_userId, preferences) => ok({
+                mirrorFrontPreview: preferences.mirrorFrontPreview,
+                captureDelaySeconds: preferences.captureDelaySeconds as 1 | 2 | 3 | 5,
+            }),
+        },
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });

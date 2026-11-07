@@ -19,6 +19,7 @@ type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/servi
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 type CustomEmojiServiceDependency = Pick<import('./platform/custom-emoji/service').CustomEmojiService, 'getCatalog' | 'createEmoji' | 'deleteEmoji'>;
 type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
+type CrewNowPreferencesServiceDependency = Pick<import('./apps/crewnow/preferences').CrewNowPreferencesService, 'getPreferences' | 'updatePreferences'>;
 type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
 type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
@@ -33,6 +34,7 @@ export type AppDependencies = {
     filesService: FilesServiceDependency;
     customEmojiService: CustomEmojiServiceDependency;
     crewNowService: CrewNowServiceDependency;
+    crewNowPreferencesService: CrewNowPreferencesServiceDependency;
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
     canViewDiscussionTarget: DiscussionTargetAuthorizer;
@@ -91,7 +93,7 @@ export function createApp(dependencies: AppDependencies) {
                         .use(createNotificationsModule(authMiddleware, dependencies.notificationsService, dependencies.vapidPublicKey))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCustomEmojiModule(authMiddleware, dependencies.customEmojiService))
-                        .use(createCrewNowModule(authMiddleware, dependencies.crewNowService))
+                        .use(createCrewNowModule(authMiddleware, dependencies.crewNowService, dependencies.crewNowPreferencesService))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )
         );

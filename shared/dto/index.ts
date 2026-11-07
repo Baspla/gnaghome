@@ -7,5 +7,7 @@ export type {
     DiscussionChangedPayload,
     NotificationSettingsChangedEvent,
     NotificationSettingsChangedPayload,
+    CrewNowPreferencesChangedEvent,
+    CrewNowPreferencesChangedPayload,
     PlatformEvent,
 } from './platform-event';
