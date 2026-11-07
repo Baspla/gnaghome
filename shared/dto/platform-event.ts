@@ -27,6 +27,12 @@ export const DiscussionChangedEventSchema = t.Object({
 });
 export type DiscussionChangedEvent = typeof DiscussionChangedEventSchema.static;
 
+export const ReactionChangedEventSchema = t.Object({
+    ...EventBaseSchema,
+    type: t.Literal('reaction.changed'),
+});
+export type ReactionChangedEvent = typeof ReactionChangedEventSchema.static;
+
 export const NotificationSettingsChangedEventSchema = t.Object({
     ...EventBaseSchema,
     type: t.Literal('notification-settings.changed'),
@@ -61,6 +67,7 @@ export type CrewNowTimelineChangedEvent = typeof CrewNowTimelineChangedEventSche
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
     DiscussionChangedEventSchema,
+    ReactionChangedEventSchema,
     NotificationSettingsChangedEventSchema,
     CustomEmojisChangedEventSchema,
     CrewNowPreferencesChangedEventSchema,
@@ -73,6 +80,7 @@ export type PlatformEvent = typeof PlatformEventSchema.static;
 export const PLATFORM_EVENT_TYPES = [
     'activity-feed.changed',
     'discussion.changed',
+    'reaction.changed',
     'notification-settings.changed',
     'custom-emojis.changed',
     'crewnow.preferences.changed',

@@ -182,7 +182,7 @@
     });
 </script>
 
-<div class="flex flex-col gap-5 pr-3">
+<div class="flex flex-col gap-5 pr-3 pb-3">
     <div>
         <h2 class="font-semibold">Push-Benachrichtigungen</h2>
         <p class="mt-1 text-sm text-surface-contrast-400-800">Wähle aus, über welche Ereignisse du informiert werden möchtest. Themen sind standardmäßig ausgeschaltet.</p>

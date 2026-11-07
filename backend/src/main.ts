@@ -35,6 +35,7 @@ const {
     crewnowPreferences: crewNowPreferencesService,
     tasks: tasksService,
     notifications: notificationsService,
+    reactions: reactionsService,
 } = services;
 const registeredTopics = await notificationsService.registerTopics(NOTIFICATION_TOPICS);
 if (!registeredTopics.ok) logger.error('notification topics failed to register', { error: registeredTopics.error.message });
@@ -68,7 +69,12 @@ const app = createApp({
     activityFeedService,
     discussionsService,
     discussionsFeedService: discussionsService,
+    reactionsService,
     canViewDiscussionTarget: async (viewerUserId, targetType, targetId) => {
+        if (targetType !== 'crewnow.post') return false;
+        return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+    },
+    canViewReactionTarget: async (viewerUserId, targetType, targetId) => {
         if (targetType !== 'crewnow.post') return false;
         return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
     },

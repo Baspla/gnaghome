@@ -10,6 +10,7 @@
         id: string;
         discussionId: string | null;
         commentCount: number;
+        reactionCount: number;
         author: Person;
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -22,7 +23,15 @@
     type Props = { post: Post; compact?: boolean; hideOpenButton?: boolean; onDelete?: (post: Post) => void };
 
     let { post, compact = true, hideOpenButton = false, onDelete }: Props = $props();
+    let reactionCount = $state(0);
+    $effect(() => {
+        reactionCount = post.reactionCount ?? 0;
+    });
     const formattedDate = $derived(formatPostDate(post.createdAt));
+
+    function updateReactionCount(count: number) {
+        reactionCount = count;
+    }
 </script>
 
 <article class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900 shadow-sm">
@@ -50,9 +59,9 @@
     </div>
 
     {#if compact}
-        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} />
+        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} onReactionCountChange={updateReactionCount} />
     {:else}
-        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} />
+        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} onReactionCountChange={updateReactionCount} />
     {/if}
 
     {#if post.taggedUsers.length > 0}

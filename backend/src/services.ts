@@ -10,6 +10,7 @@ import { TasksService } from './platform/tasks';
 import { NotificationsService } from './platform/notifications/service';
 import { createWebPushSender, type VapidConfig } from './platform/notifications/push';
 import { CustomEmojiService } from './platform/custom-emoji/service';
+import { ReactionsService } from './platform/reactions/service';
 
 export function createServices(
     db: AppDatabase,
@@ -24,10 +25,27 @@ export function createServices(
     const tasks = new TasksService(db);
     const files = new FilesService(db, new LocalFileStorage(filesDirectory));
     const customEmoji = new CustomEmojiService(db, files, broadcast);
-    const crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications, broadcast);
+    let crewnow!: CrewNowService;
+    const reactions = new ReactionsService(
+        db,
+        broadcast,
+        undefined,
+        (name) => customEmoji.hasEmoji(name),
+        async (target, actorUserId) => {
+            if (target.targetType !== 'crewnow.post') return;
+            const ownerUserId = await crewnow.getPostOwnerUserId(target.targetId);
+            if (!ownerUserId || ownerUserId === actorUserId) return;
+            await notifications.notifyUsers('crewnow.post.reaction', [ownerUserId], {
+                title: 'Neue Reaktion auf deinen CrewNow',
+                body: 'Jemand hat auf deinen CrewNow reagiert.',
+                url: `/crewnow/posts/${encodeURIComponent(target.targetId)}`,
+            });
+        },
+    );
+    crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications, broadcast, reactions);
     const crewnowPreferences = new CrewNowPreferencesService(db, broadcast);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);
 
-    return { users, activityFeed, discussions, files, customEmoji, crewnow, crewnowPreferences, tasks, notifications };
+    return { users, activityFeed, discussions, reactions, files, customEmoji, crewnow, crewnowPreferences, tasks, notifications };
 }

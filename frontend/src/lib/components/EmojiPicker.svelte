@@ -4,9 +4,19 @@
     import { getCustomEmojis } from '$lib/custom-emoji-catalog.svelte';
 
     type Emoji = { value: string; label: string; keywords: string[] };
-    type Props = { onSelect: (emoji: string) => void };
+    type Props = {
+        onSelect: (emoji: string) => void;
+        triggerLabel?: string;
+        triggerText?: string;
+        contentZIndex?: string;
+    };
 
-    let { onSelect }: Props = $props();
+    let {
+        onSelect,
+        triggerLabel = 'Emoji auswählen',
+        triggerText = 'Emoji',
+        contentZIndex = 'z-50',
+    }: Props = $props();
     let open = $state(false);
     let searchQuery = $state('');
     const pickerId = $props.id();
@@ -54,15 +64,15 @@
     <Popover.Trigger
         type="button"
         class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        aria-label="Emoji auswählen"
-        title="Emoji einfügen"
+        aria-label={triggerLabel}
+        title={triggerLabel}
     >
         <Smile class="h-4 w-4" aria-hidden="true" />
-        <span>Emoji</span>
+        <span>{triggerText}</span>
     </Popover.Trigger>
     <Popover.Portal>
         <Popover.Content
-            class="z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-surface-300-700 bg-surface-50-950 p-3 shadow-lg"
+            class={`${contentZIndex} w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-surface-300-700 bg-surface-50-950 p-3 shadow-lg`}
             align="start"
             sideOffset={8}
             aria-label="Emoji auswählen"

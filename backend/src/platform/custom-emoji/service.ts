@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { createLogger } from '../../lib/logger';
 import { err, ok, type BadRequestError, type ConflictError, type ForbiddenError, type InternalError, type NotFoundError, type Result } from '../../lib/result';
@@ -82,6 +82,19 @@ export class CustomEmojiService {
         } catch (error) {
             logger.error('failed to load custom emoji catalogue', { error: String(error) });
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Custom Emojis konnten nicht geladen werden.' });
+        }
+    }
+
+    async hasEmoji(name: string): Promise<boolean> {
+        if (!validEmojiName(name)) return false;
+        try {
+            const [found] = await this.db.select({ name: customEmoji.name }).from(customEmoji)
+                .innerJoin(storedFile, eq(storedFile.id, customEmoji.fileId))
+                .where(and(eq(customEmoji.name, name), eq(storedFile.status, 'ready'), eq(storedFile.isPrivate, false)))
+                .limit(1);
+            return Boolean(found);
+        } catch {
+            return false;
         }
     }
 
