@@ -177,7 +177,13 @@
                                         <span> mit </span>
                                         {#if activity.data.taggedUsers.length <= 3}
                                             {#each activity.data.taggedUsers as person, index (person.id)}
-                                                {#if index > 0}{#if index === activity.data.taggedUsers.length - 1}<span> und </span>{:else}<span>, </span>{/if}{/if}
+                                                {#if index > 0}
+                                                    {#if index === activity.data.taggedUsers.length - 1}
+                                                        {' '}<span>und</span>{' '}
+                                                    {:else}
+                                                        <span>,</span>{' '}
+                                                    {/if}
+                                                {/if}
                                                 <Username userId={person.id} name={person.name} class="font-semibold text-surface-950-50" />
                                             {/each}
                                         {:else}
