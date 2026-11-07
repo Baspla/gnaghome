@@ -15,6 +15,7 @@
         discussionId: string;
         commentCount: number;
         reactionCount: number;
+        reactionEmoji: string | null;
         author: { id: string; name: string; image: string | null };
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };

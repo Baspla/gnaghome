@@ -29,6 +29,7 @@ export type CrewNowPostSummary = {
     discussionId: string | null;
     commentCount: number;
     reactionCount: number;
+    reactionEmoji: string | null;
     author: CrewNowUserSummary;
     backImage: { id: string; url: string };
     frontImage: { id: string; url: string };
@@ -80,7 +81,7 @@ export class CrewNowService {
             notifyUsers: async () => {},
         },
         private readonly broadcast: BroadcastPublisher = async () => ({ ok: true, value: null }),
-        private readonly reactions?: Pick<ReactionsService, 'getCounts' | 'deleteTargetReactions'>,
+        private readonly reactions?: Pick<ReactionsService, 'getCounts' | 'getRandomReactionEmojis' | 'deleteTargetReactions'>,
     ) {}
 
     private async getTaggedUsers(postId: string): Promise<CrewNowUserSummary[]> {
@@ -96,7 +97,13 @@ export class CrewNowService {
         return rows;
     }
 
-    private async resolvePost(post: CrewNowPost, viewerUserId: string, commentCount?: number, reactionCount?: number): Promise<CrewNowPostSummary | null> {
+    private async resolvePost(
+        post: CrewNowPost,
+        viewerUserId: string,
+        commentCount?: number,
+        reactionCount?: number,
+        reactionEmoji?: string | null,
+    ): Promise<CrewNowPostSummary | null> {
         const [author] = await this.db.select({ id: user.id, name: user.name, image: user.image })
             .from(user)
             .where(eq(user.id, post.authorUserId))
@@ -108,11 +115,15 @@ export class CrewNowService {
         const reactionCounts = reactionCount === undefined && this.reactions
             ? await this.reactions.getCounts('crewnow.post', [post.id])
             : {};
+        const reactionEmojis = reactionEmoji === undefined && this.reactions
+            ? await this.reactions.getRandomReactionEmojis('crewnow.post', [post.id])
+            : {};
         return {
             id: post.id,
             discussionId: post.discussionId,
             commentCount: commentCount ?? (post.discussionId && commentCounts ? commentCounts[post.discussionId] ?? 0 : 0),
             reactionCount: reactionCount ?? reactionCounts[post.id] ?? 0,
+            reactionEmoji: reactionEmoji !== undefined ? reactionEmoji : reactionEmojis[post.id] ?? null,
             author,
             backImage: { id: post.backImageFileId, url: `/api/v1/files/${post.backImageFileId}` },
             frontImage: { id: post.frontImageFileId, url: `/api/v1/files/${post.frontImageFileId}` },
@@ -429,11 +440,15 @@ export class CrewNowService {
             const discussionIds = pageRows.flatMap((post) => post.discussionId ? [post.discussionId] : []);
             const commentCounts = await this.discussions.getMessageCounts(discussionIds);
             const reactionCounts = this.reactions ? await this.reactions.getCounts('crewnow.post', pageRows.map((post) => post.id)) : {};
+            const reactionEmojis = this.reactions
+                ? await this.reactions.getRandomReactionEmojis('crewnow.post', pageRows.map((post) => post.id))
+                : {};
             const items = (await Promise.all(pageRows.map((post) => this.resolvePost(
                 post,
                 viewerUserId,
                 post.discussionId ? commentCounts[post.discussionId] ?? 0 : 0,
                 reactionCounts[post.id] ?? 0,
+                reactionEmojis[post.id] ?? null,
             )))).filter((post): post is CrewNowPostSummary => post !== null);
             const last = pageRows[pageRows.length - 1];
             return ok({

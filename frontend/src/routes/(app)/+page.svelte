@@ -221,13 +221,13 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm text-surface-600-400 transition-colors hover:bg-surface-200-800 hover:text-primary-700-300 sm:px-3"
                                     aria-label={activityLinkLabel(activity)}
                                 >
-                                    {#if activity.discussionId}
-                                        <MessageCircle class="h-4 w-4" aria-hidden="true" />
-                                        <span>{activity.commentCount}</span>
-                                    {/if}
                                     {#if activity.target?.type === 'crewnow.post'}
                                         <Heart class="ml-2 h-4 w-4" aria-hidden="true" />
                                         <span>{activity.reactionCount}</span>
+                                    {/if}
+                                    {#if activity.discussionId}
+                                        <MessageCircle class="h-4 w-4" aria-hidden="true" />
+                                        <span>{activity.commentCount}</span>
                                     {/if}
                                     <ChevronRight class="h-4 w-4" aria-hidden="true" />
                                 </a>

@@ -58,6 +58,17 @@ describe('ReactionsService', () => {
             .toEqual({ 'post-1': 2, 'post-2': 1 });
     });
 
+    it('returns one sampled emoji per target and omits targets without reactions', async () => {
+        await service.toggleReaction('crewnow.post', 'post-1', 'user-1', '❤️');
+        await service.toggleReaction('crewnow.post', 'post-1', 'user-2', '🔥');
+        await service.toggleReaction('crewnow.post', 'post-2', 'user-1', '🎉');
+
+        const sampled = await service.getRandomReactionEmojis('crewnow.post', ['post-1', 'post-2', 'post-3']);
+        expect(['❤️', '🔥']).toContain(sampled['post-1']);
+        expect(sampled['post-2']).toBe('🎉');
+        expect(sampled).not.toHaveProperty('post-3');
+    });
+
     it('accepts known custom emoji tokens and rejects unknown tokens or non-emoji text', async () => {
         expect(await service.toggleReaction('crewnow.post', 'post-1', 'user-1', ':party_blob:'))
             .toMatchObject({ ok: true, value: { reaction: { emoji: ':party_blob:' } } });

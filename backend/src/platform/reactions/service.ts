@@ -118,6 +118,25 @@ export class ReactionsService {
         return Object.fromEntries(rows.map((row) => [row.targetId, row.count]));
     }
 
+    async getRandomReactionEmojis(targetType: string, targetIds: readonly string[]): Promise<Record<string, string>> {
+        if (!TARGET_TYPE_PATTERN.test(targetType) || targetIds.length === 0) return {};
+        const uniqueIds = [...new Set(targetIds.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 128))];
+        if (uniqueIds.length === 0) return {};
+        const rows = await this.db.select({ targetId: reaction.targetId, emoji: reaction.emoji })
+            .from(reaction)
+            .where(and(eq(reaction.targetType, targetType), inArray(reaction.targetId, uniqueIds)));
+        const byTarget = new Map<string, string[]>();
+        for (const row of rows) {
+            const emojis = byTarget.get(row.targetId) ?? [];
+            emojis.push(row.emoji);
+            byTarget.set(row.targetId, emojis);
+        }
+        return Object.fromEntries([...byTarget].map(([targetId, emojis]) => [
+            targetId,
+            emojis[Math.floor(Math.random() * emojis.length)]!,
+        ]));
+    }
+
     async toggleReaction(
         targetType: string,
         targetId: string,

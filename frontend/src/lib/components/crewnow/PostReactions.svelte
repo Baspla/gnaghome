@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { Popover } from 'bits-ui';
-    import { Heart } from '@lucide/svelte';
     import { api } from '$lib/api';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import InlineText from '$lib/components/InlineText.svelte';
@@ -13,12 +12,16 @@
         emoji: string;
         user: { id: string; name: string; image: string | null };
     };
-    type Props = { postId: string; count: number; onCountChange: (count: number) => void };
+    type Props = {
+        postId: string;
+        count: number;
+        reactionEmoji: string | null;
+        onReactionsChange: (count: number, emoji: string | null) => void;
+    };
 
-    let { postId, count, onCountChange }: Props = $props();
+    let { postId, count, reactionEmoji, onReactionsChange }: Props = $props();
     let open = $state(false);
     let reactions = $state<Reaction[]>([]);
-    let viewerReaction = $state<string | null>(null);
     let loading = $state(false);
     let submitting = $state(false);
     let errorMessage = $state<string | null>(null);
@@ -31,8 +34,10 @@
             const response = await api.reactions.targets({ targetType: 'crewnow.post' })({ targetId: postId }).get();
             if (response.error || !response.data) throw new Error('load failed');
             reactions = response.data.items as Reaction[];
-            viewerReaction = response.data.viewerReaction;
-            onCountChange(response.data.count);
+            const sampledEmoji = reactions.length > 0
+                ? reactions[Math.floor(Math.random() * reactions.length)]?.emoji ?? null
+                : null;
+            onReactionsChange(response.data.count, sampledEmoji);
             errorMessage = null;
         } catch {
             errorMessage = 'Reaktionen konnten nicht geladen werden. Bitte versuche es erneut.';
@@ -70,17 +75,28 @@
     });
 </script>
 
-<Popover.Root bind:open onOpenChange={(isOpen) => { if (isOpen) void refresh(); }}>
-    <Popover.Trigger
-        type="button"
-        class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:text-error-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        aria-label={`${count} ${count === 1 ? 'Reaktion' : 'Reaktionen'} anzeigen`}
-        title="Reaktionen anzeigen"
-    >
-        <Heart class={viewerReaction !== null ? 'h-4 w-4 text-error-600-400' : 'h-4 w-4'} fill={viewerReaction !== null ? 'currentColor' : 'none'} aria-hidden="true" />
-        <span>{count}</span>
-    </Popover.Trigger>
-    <Popover.Portal>
+{#if count === 0}
+        <EmojiPicker
+            onSelect={(emoji) => void setReaction(emoji)}
+            triggerLabel="Reaktion hinzufügen"
+            triggerText=""
+            triggerIcon="heart"
+            triggerCount={0}
+            triggerClass="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:text-error-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            contentZIndex="z-[80]"
+        />
+{:else}
+    <Popover.Root bind:open onOpenChange={(isOpen) => { if (isOpen) void refresh(); }}>
+        <Popover.Trigger
+            type="button"
+            class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:text-error-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            aria-label={`${count} ${count === 1 ? 'Reaktion' : 'Reaktionen'} anzeigen`}
+            title="Reaktionen anzeigen"
+        >
+            <InlineText text={reactionEmoji ?? '❤️'} class="text-xl leading-none" />
+            <span>{count}</span>
+        </Popover.Trigger>
+        <Popover.Portal>
         <Popover.Content
             side="top"
             align="end"
@@ -89,12 +105,7 @@
         >
             <div class="flex items-center justify-between gap-3">
                 <h2 class="font-semibold">Reaktionen <span class="text-sm font-normal text-surface-600-400">({count})</span></h2>
-                <EmojiPicker
-                    onSelect={(emoji) => void setReaction(emoji)}
-                    triggerLabel="Reaktion hinzufügen"
-                    triggerText="Reagieren"
-                    contentZIndex="z-[80]"
-                />
+                <EmojiPicker onSelect={(emoji) => void setReaction(emoji)} triggerLabel="Reaktion hinzufügen" triggerText="Reagieren" contentZIndex="z-[80]" />
             </div>
             {#if loading}
                 <p class="py-5 text-center text-sm text-surface-600-400" role="status">Reaktionen werden geladen …</p>
@@ -114,5 +125,6 @@
             {#if errorMessage}<p class="mt-3 text-sm text-error-700-300" role="alert">{errorMessage}</p>{/if}
             <p class="sr-only">Emoji auswählen, um zu reagieren. Dieselbe Reaktion erneut auszuwählen, entfernt sie.</p>
         </Popover.Content>
-    </Popover.Portal>
-</Popover.Root>
+        </Popover.Portal>
+    </Popover.Root>
+{/if}

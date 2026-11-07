@@ -11,6 +11,7 @@
         discussionId: string | null;
         commentCount: number;
         reactionCount: number;
+        reactionEmoji: string | null;
         author: Person;
         backImage: { id: string; url: string };
         frontImage: { id: string; url: string };
@@ -24,13 +25,16 @@
 
     let { post, compact = true, hideOpenButton = false, onDelete }: Props = $props();
     let reactionCount = $state(0);
+    let reactionEmoji = $state<string | null>(null);
     $effect(() => {
         reactionCount = post.reactionCount ?? 0;
+        reactionEmoji = post.reactionEmoji ?? null;
     });
     const formattedDate = $derived(formatPostDate(post.createdAt));
 
-    function updateReactionCount(count: number) {
+    function updateReactions(count: number, emoji: string | null) {
         reactionCount = count;
+        reactionEmoji = emoji;
     }
 </script>
 
@@ -59,9 +63,9 @@
     </div>
 
     {#if compact}
-        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} onReactionCountChange={updateReactionCount} />
+        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} {reactionEmoji} onReactionsChange={updateReactions} />
     {:else}
-        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} onReactionCountChange={updateReactionCount} />
+        <PostImage backImageUrl={post.backImage.url} frontImageUrl={post.frontImage.url} caption={post.caption} postId={post.id} {reactionCount} {reactionEmoji} onReactionsChange={updateReactions} />
     {/if}
 
     {#if post.taggedUsers.length > 0}

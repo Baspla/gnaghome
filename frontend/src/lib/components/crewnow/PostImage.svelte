@@ -7,7 +7,8 @@
         caption?: string | null;
         postId: string;
         reactionCount: number;
-        onReactionCountChange: (count: number) => void;
+        reactionEmoji: string | null;
+        onReactionsChange: (count: number, emoji: string | null) => void;
         alt?: string;
         class?: string;
     };
@@ -18,7 +19,8 @@
         caption = null,
         postId,
         reactionCount,
-        onReactionCountChange,
+        reactionEmoji,
+        onReactionsChange,
         alt = 'CrewNow-Foto',
         class: className,
     }: Props = $props();
@@ -55,7 +57,7 @@
     }
 </script>
 
-<figure class={['w-full pb-4', className]}>
+<figure class={['w-full', className]}>
     <div class="relative min-h-72 aspect-[3/4] overflow-hidden rounded-xl bg-surface-200-800">
         <img
             src={mainImage}
@@ -80,10 +82,10 @@
             </button>
         {/if}
         <div class="absolute bottom-3 right-3 z-10">
-            <PostReactions {postId} count={reactionCount} onCountChange={onReactionCountChange} />
+            <PostReactions {postId} count={reactionCount} {reactionEmoji} onReactionsChange={onReactionsChange} />
         </div>
     </div>
     {#if caption}
-        <figcaption class="mt-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200"><InlineText text={caption} /></figcaption>
+        <figcaption class="my-3 px-4 text-md font-semibold leading-relaxed whitespace-pre-wrap break-words text-surface-800-200"><InlineText text={caption} /></figcaption>
     {/if}
 </figure>

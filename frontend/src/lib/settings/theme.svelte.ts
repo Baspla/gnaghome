@@ -20,13 +20,29 @@ export interface ThemeOption {
 
 /** Must match the themes imported in `src/routes/layout.css`. */
 export const THEMES: ThemeOption[] = [
-    { id: "cerberus", label: "Cerberus" },
     { id: "catppuccin", label: "Catppuccin" },
+    { id: "cerberus", label: "Cerberus" },
     { id: "concord", label: "Concord" },
+    { id: "crimson", label: "Crimson" },
     { id: "dracula", label: "Dracula" },
+    { id: "fennec", label: "Fennec" },
+    { id: "hamlindigo", label: "Hamlindigo" },
+    { id: "mint", label: "Mint" },
+    { id: "modern", label: "Modern" },
     { id: "mona", label: "Mona" },
+    { id: "nosh", label: "Nosh" },
+    { id: "nouveau", label: "Nouveau" },
+    { id: "pine", label: "Pine" },
+    { id: "reign", label: "Reign" },
+    { id: "rocket", label: "Rocket" },
     { id: "rose", label: "Rose" },
+    { id: "rosepine", label: "Rosepine" },
+    { id: "sahara", label: "Sahara" },
     { id: "seafoam", label: "Seafoam" },
+    { id: "terminus", label: "Terminus" },
+    { id: "vintage", label: "Vintage" },
+    { id: "vox", label: "Vox" },
+    { id: "wintry", label: "Wintry" },
 ];
 
 export const THEME_MODES: ThemeModeOption[] = [

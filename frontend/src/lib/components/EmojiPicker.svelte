@@ -1,7 +1,8 @@
 <script lang="ts">
     import { Label, Popover } from 'bits-ui';
-    import { Search, Smile } from '@lucide/svelte';
+    import { Heart, Search, Smile } from '@lucide/svelte';
     import { getCustomEmojis } from '$lib/custom-emoji-catalog.svelte';
+    import InlineText from '$lib/components/InlineText.svelte';
 
     type Emoji = { value: string; label: string; keywords: string[] };
     type Props = {
@@ -9,6 +10,9 @@
         triggerLabel?: string;
         triggerText?: string;
         contentZIndex?: string;
+        triggerIcon?: 'smile' | 'heart';
+        triggerCount?: number;
+        triggerClass?: string;
     };
 
     let {
@@ -16,6 +20,9 @@
         triggerLabel = 'Emoji auswählen',
         triggerText = 'Emoji',
         contentZIndex = 'z-50',
+        triggerIcon = 'smile',
+        triggerCount,
+        triggerClass = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
     }: Props = $props();
     let open = $state(false);
     let searchQuery = $state('');
@@ -63,12 +70,22 @@
 <Popover.Root bind:open>
     <Popover.Trigger
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        aria-label={triggerLabel}
+        class={triggerClass}
+        aria-label={triggerCount === undefined || triggerCount === 0
+            ? triggerLabel
+            : `${triggerCount} ${triggerCount === 1 ? 'Reaktion' : 'Reaktionen'} anzeigen`}
         title={triggerLabel}
     >
-        <Smile class="h-4 w-4" aria-hidden="true" />
-        <span>{triggerText}</span>
+        {#if triggerIcon === 'heart'}
+            <Heart class="h-4 w-4" aria-hidden="true" />
+        {:else}
+            <Smile class="h-4 w-4" aria-hidden="true" />
+        {/if}
+        {#if triggerCount !== undefined}
+            <span>{triggerCount}</span>
+        {:else if triggerText}
+            <span>{triggerText}</span>
+        {/if}
     </Popover.Trigger>
     <Popover.Portal>
         <Popover.Content

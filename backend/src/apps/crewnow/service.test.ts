@@ -10,6 +10,7 @@ import { FilesService } from '../../platform/files/service';
 import { LocalFileStorage } from '../../platform/files/storage';
 import { CrewNowService } from './service';
 import { DiscussionsService } from '../../platform/discussions/service';
+import { ReactionsService } from '../../platform/reactions/service';
 
 const PNG_BYTES = Uint8Array.from(Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pJ8AAAAASUVORK5CYII=',
@@ -26,6 +27,7 @@ describe('CrewNowService', () => {
     let notifyAll: ReturnType<typeof mock>;
     let notifyUsers: ReturnType<typeof mock>;
     let discussions: DiscussionsService;
+    let reactions: ReactionsService;
     let broadcast: ReturnType<typeof mock>;
 
     async function uploadImage(userId = 'user-1') {
@@ -42,10 +44,11 @@ describe('CrewNowService', () => {
         invalidateFeed = mock(async () => {});
         const activityFeed = { recordActivity, invalidateFeed } as unknown as ActivityFeedService;
         discussions = new DiscussionsService(database.db, async () => ok(null));
+        reactions = new ReactionsService(database.db);
         broadcast = mock(async () => ok(null));
         notifyAll = mock(async () => {});
         notifyUsers = mock(async () => {});
-        service = new CrewNowService(database.db, files, activityFeed, discussions, { notifyAll, notifyUsers }, broadcast);
+        service = new CrewNowService(database.db, files, activityFeed, discussions, { notifyAll, notifyUsers }, broadcast, reactions);
         await database.db.insert(user).values([
             { id: 'user-1', name: 'Alice', email: 'alice@example.test' },
             { id: 'user-2', name: 'Bob', email: 'bob@example.test' },
@@ -76,6 +79,8 @@ describe('CrewNowService', () => {
             ok: true,
             value: {
                 id: 'post-1',
+                reactionCount: 0,
+                reactionEmoji: null,
                 caption: 'An afternoon together',
                 author: { id: 'user-1', name: 'Alice' },
                 taggedUsers: [{ id: 'user-2', name: 'Bob' }, { id: 'user-3', name: 'Cara' }],
@@ -136,6 +141,33 @@ describe('CrewNowService', () => {
             ok: true,
             value: { items: [{ id: 'post-comment-count', commentCount: 2 }] },
         });
+    });
+
+    it('returns a sampled existing reaction with post and timeline summaries', async () => {
+        await service.createPost('user-1', {
+            id: 'post-viewer-reaction',
+            backImageFileId: await uploadImage(),
+            frontImageFileId: await uploadImage(),
+            caption: null,
+            taggedUserIds: [],
+        });
+        await reactions.toggleReaction('crewnow.post', 'post-viewer-reaction', 'user-2', '❤️');
+        await reactions.toggleReaction('crewnow.post', 'post-viewer-reaction', 'user-3', '🔥');
+
+        const post = await service.getPost('user-2', 'post-viewer-reaction');
+        expect(post).toMatchObject({
+            ok: true,
+            value: { reactionCount: 2 },
+        });
+        if (!post.ok || post.value.reactionEmoji === null) throw new Error('expected a sampled reaction emoji');
+        expect(['❤️', '🔥']).toContain(post.value.reactionEmoji);
+        const timeline = await service.getTimeline('user-2');
+        expect(timeline).toMatchObject({
+            ok: true,
+            value: { items: [{ id: 'post-viewer-reaction', reactionCount: 2 }] },
+        });
+        if (!timeline.ok || timeline.value.items[0]?.reactionEmoji == null) throw new Error('expected a sampled timeline reaction emoji');
+        expect(['❤️', '🔥']).toContain(timeline.value.items[0].reactionEmoji);
     });
 
     it('does not duplicate the post or activity when creation is retried with the same ID', async () => {
