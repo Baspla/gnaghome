@@ -49,6 +49,7 @@
         { value: '🤓', label: 'Nerd', keywords: ['nerd', 'geek', 'glasses', 'brille', 'streber'] },
         { value: '💩', label: 'Kackhaufen', keywords: ['poop', 'shit', 'poo', 'kacke', 'scheiße', 'haufen'] },
         { value: '🫪', label: 'Wahnsinn', keywords: ['closeup', 'lens', 'freaky', 'nah','distorted'] },
+        { value: '🤔', label: 'Nachdenkend', keywords: ['thinking', 'pondering', 'curious', 'nachdenklich', 'überlegen', 'reflektieren'] }
     ];
     const normalizedQuery = $derived(searchQuery.trim().toLowerCase());
     const filteredEmojis = $derived(normalEmojis.filter((emoji) =>
