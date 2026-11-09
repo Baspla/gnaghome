@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { authClient } from "$lib/auth-client";
     import { page } from "$app/state";
     import { THEMES, THEME_MODES, themeManager } from "$lib/settings/theme.svelte";
@@ -37,7 +38,50 @@
     let customEmojiBusy = $state(false);
     let customEmojiError = $state<string | null>(null);
     let customEmojiSuccess = $state<string | null>(null);
+    let profileBio = $state('');
+    let profileAccentColor = $state('#6366f1');
+    let profileLoading = $state(true);
+    let profileSaving = $state(false);
+    let profileError = $state<string | null>(null);
+    let profileSuccess = $state<string | null>(null);
     const customEmojis = $derived(getCustomEmojis());
+
+    async function loadProfile() {
+        try {
+            const response = await api.users.me.get();
+            if (response.error || !response.data) throw new Error('Profil konnte nicht geladen werden.');
+            profileBio = response.data.bio ?? '';
+            profileAccentColor = response.data.accentColor;
+            profileError = null;
+        } catch {
+            profileError = 'Deine Profilangaben konnten nicht geladen werden.';
+        } finally {
+            profileLoading = false;
+        }
+    }
+
+    async function saveProfile(event: SubmitEvent) {
+        event.preventDefault();
+        if (profileSaving) return;
+        profileSaving = true;
+        profileError = null;
+        profileSuccess = null;
+        try {
+            const response = await api.users.me.put({ bio: profileBio, accentColor: profileAccentColor });
+            if (response.error || !response.data) throw new Error('Profil konnte nicht gespeichert werden.');
+            profileBio = response.data.bio ?? '';
+            profileAccentColor = response.data.accentColor;
+            profileSuccess = 'Dein Profil wurde gespeichert.';
+        } catch {
+            profileError = 'Dein Profil konnte nicht gespeichert werden. Bitte versuche es erneut.';
+        } finally {
+            profileSaving = false;
+        }
+    }
+
+    onMount(() => {
+        void loadProfile();
+    });
 
     function apiErrorMessage(response: unknown, fallback: string): string | null {
         const requestError: unknown = typeof response === 'object' && response !== null
@@ -188,7 +232,47 @@
                         <p class="text-sm text-surface-contrast-400-800">{user?.email}</p>
                     </div>
                 </div>
-                <button type="button" class="btn preset-outlined-error" onclick={logout}>Abmelden</button>
+                <form class="flex flex-col gap-5" onsubmit={saveProfile}>
+                    <div>
+                        <h2 class="text-lg font-semibold">Dein Profil gestalten</h2>
+                        <p class="mt-1 text-sm text-surface-contrast-400-800">Diese Angaben sind für andere Mitglieder auf deinem Profil sichtbar.</p>
+                    </div>
+                    {#if profileLoading}
+                        <p class="text-sm text-surface-contrast-400-800" role="status">Profilangaben werden geladen …</p>
+                    {:else}
+                        <div class="flex flex-col gap-2">
+                            <label for="profile-bio" class="font-medium">Beschreibung</label>
+                            <textarea
+                                id="profile-bio"
+                                bind:value={profileBio}
+                                maxlength="300"
+                                rows="4"
+                                placeholder="Erzähl etwas über dich …"
+                                class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-surface-950-50 placeholder:text-surface-500-500 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+                            ></textarea>
+                            <p class="text-right text-xs text-surface-600-400">{profileBio.length}/300 Zeichen</p>
+                        </div>
+                        <div class="flex items-center justify-between gap-4 rounded-lg border border-surface-300-700 p-3">
+                            <div>
+                                <label for="profile-accent-color" class="font-medium">Akzentfarbe</label>
+                                <p class="mt-1 text-sm text-surface-contrast-400-800">Farbe des Profilbanners auswählen.</p>
+                            </div>
+                            <input
+                                id="profile-accent-color"
+                                type="color"
+                                bind:value={profileAccentColor}
+                                aria-label="Akzentfarbe auswählen"
+                                class="h-11 w-14 cursor-pointer rounded-md border border-surface-300-700 bg-surface-50-950 p-1"
+                            />
+                        </div>
+                        {#if profileError}<p class="text-sm text-error-700-300" role="alert">{profileError}</p>{/if}
+                        {#if profileSuccess}<p class="text-sm text-success-700-300" role="status">{profileSuccess}</p>{/if}
+                        <button type="submit" class="btn preset-filled-primary-500 self-start" disabled={profileSaving}>
+                            {profileSaving ? 'Wird gespeichert …' : 'Profil speichern'}
+                        </button>
+                    {/if}
+                </form>
+                <button type="button" class="btn preset-outlined-error-500 self-center" onclick={logout}>Abmelden</button>
                 <p class="text-center text-xs text-surface-contrast-400-800">Version {__APP_VERSION__}</p>
             </div>
         {:else if activeSection === "appearance"}

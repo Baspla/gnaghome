@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { account, session } from '../auth/schema';
 
@@ -20,11 +20,30 @@ export const user = sqliteTable('user', {
 	groups: text('groups').default('[]'),
 });
 
-export const userRelations = relations(user, ({ many }) => ({
+export const userProfile = sqliteTable('user_profile', {
+	userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+	bio: text('bio'),
+	accentColor: text('accent_color').default('#6366f1').notNull(),
+});
+
+export const userRelations = relations(user, ({ many, one }) => ({
 	sessions: many(session),
 	accounts: many(account),
+	profile: one(userProfile, {
+		fields: [user.id],
+		references: [userProfile.userId],
+	}),
+}));
+
+export const userProfileRelations = relations(userProfile, ({ one }) => ({
+	user: one(user, {
+		fields: [userProfile.userId],
+		references: [user.id],
+	}),
 }));
 
 export type User = typeof user.$inferSelect;
+export type UserProfile = typeof userProfile.$inferSelect;
+export type UserWithProfile = User & Pick<UserProfile, 'bio' | 'accentColor'>;
 
-export type RedactedUser = Pick<User, 'id' | 'name' | 'image' | 'createdAt'>;
+export type RedactedUser = Pick<UserWithProfile, 'id' | 'name' | 'image' | 'createdAt' | 'bio' | 'accentColor'>;

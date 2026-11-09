@@ -2,10 +2,10 @@ import { Elysia, t } from 'elysia'
 import { Modules } from '@gnaghome/shared/constants'
 import type { AuthenticatedUser, createAuthMiddleware } from '../auth'
 
-type UserServiceDependency = Pick<import('./service').UserService, 'getUserAsUser' | 'listUsers'>;
+type UserServiceDependency = Pick<import('./service').UserService, 'getUserAsUser' | 'listUsers' | 'updateProfile'>;
 
 function toUserProfile(
-    userData: import('./schema').RedactedUser | import('./schema').User,
+    userData: import('./schema').RedactedUser | import('./schema').UserWithProfile,
     currentUser: AuthenticatedUser,
 ) {
     const isCurrentUser = userData.id === currentUser.id;
@@ -16,6 +16,8 @@ function toUserProfile(
         emailVerified: 'emailVerified' in userData ? userData.emailVerified : isCurrentUser ? currentUser.emailVerified : undefined,
         image: userData.image,
         createdAt: userData.createdAt,
+        bio: userData.bio,
+        accentColor: userData.accentColor,
         isAdmin: isCurrentUser && currentUser.isAdmin,
     };
 }
@@ -39,6 +41,17 @@ export function createUserModule(authMiddleware: ReturnType<typeof createAuthMid
         }
         return toUserProfile(result.value, user);
     }, { auth: true })
+    .put('/me', async ({ user, userService, body, status }) => {
+        const result = await userService.updateProfile(user.id, body);
+        if (!result.ok) return status(result.error.status, { error: result.error });
+        return result.value;
+    }, {
+        body: t.Object({
+            bio: t.String({ maxLength: 300 }),
+            accentColor: t.String({ pattern: '^#[0-9a-fA-F]{6}$' }),
+        }),
+        auth: true,
+    })
     .get('/:id', async ({ user, params, userService, status }) => {
         const result = await userService.getUserAsUser(user.id, params.id)
         if (!result.ok) {

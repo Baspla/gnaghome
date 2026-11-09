@@ -7,6 +7,8 @@ type UserProfile = {
     name: string;
     image: string | null;
     createdAt: string;
+    bio: string | null;
+    accentColor: string;
 };
 
 export const load: PageServerLoad = async ({ params, request, fetch }) => {
@@ -40,6 +42,8 @@ export const load: PageServerLoad = async ({ params, request, fetch }) => {
             name: profile.name,
             image: profile.image,
             createdAt: profile.createdAt,
+            bio: profile.bio,
+            accentColor: profile.accentColor,
         },
     };
 };

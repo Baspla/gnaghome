@@ -1,6 +1,9 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { Popover } from 'bits-ui';
     import { ArrowUpRight } from '@lucide/svelte';
+    import { api } from '$lib/api';
+    import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
 
     type Props = {
@@ -22,9 +25,38 @@
         class: className,
         avatarClass,
     }: Props = $props();
+
+    let open = $state(false);
+    let bio = $state<string | null>(null);
+    let accentColor = $state('#6366f1');
+    const gateway = getGatewayManager();
+
+    async function refreshProfile() {
+        try {
+            const response = await api.users({ id: userId }).get();
+            if (response.error || !response.data) return;
+            bio = response.data.bio ?? null;
+            accentColor = response.data.accentColor;
+        } catch {
+            // Keep the current popover content if the API is temporarily unavailable.
+        }
+    }
+
+    onMount(() => {
+        const unsubscribeEvent = gateway.onEvent('user.profile.changed', (event) => {
+            if (open && event.entityId === userId) void refreshProfile();
+        });
+        const unsubscribeConnected = gateway.onConnected(() => {
+            if (open) void refreshProfile();
+        });
+        return () => {
+            unsubscribeEvent();
+            unsubscribeConnected();
+        };
+    });
 </script>
 
-<Popover.Root>
+<Popover.Root bind:open onOpenChange={(isOpen) => { if (isOpen) void refreshProfile(); }}>
     <Popover.Trigger
         type="button"
         aria-label={triggerType === 'avatar' ? `Profil von ${name} anzeigen` : undefined}
@@ -47,9 +79,14 @@
             class="z-50 flex w-64 flex-col items-stretch outline-none"
         >
             <div class="pointer-events-none relative z-10 flex items-start px-5">
-                <ProfileAvatar {image} {name} size="h-20 w-20 text-3xl" class="shadow-md" />
+                <ProfileAvatar {image} {name} size="h-20 w-20 text-3xl" class="" />
             </div>
-            <div class="relative -mt-10 min-h-24 rounded-2xl border border-surface-300-700/60 bg-surface-50-950 px-5 pb-5 pt-12 text-surface-950-50 shadow-xl">
+            <div class="relative -mt-10 min-h-24 overflow-hidden rounded-2xl border border-surface-300-700/60 bg-surface-50-950 px-5 pb-5 pt-12 text-surface-950-50 shadow-xl">
+                <div
+                    class="pointer-events-none absolute inset-x-0 top-0 h-12"
+                    style:background={`linear-gradient(to bottom, ${accentColor}, transparent)`}
+                    aria-hidden="true"
+                ></div>
                 <a
                     href={`/profile/${encodeURIComponent(userId)}`}
                     aria-label={`Profil von ${name} öffnen`}
@@ -58,7 +95,15 @@
                 >
                     <ArrowUpRight class="h-4 w-4" aria-hidden="true" />
                 </a>
-                <p class="max-w-full truncate text-left text-lg font-semibold">{name}</p>
+                <p class="relative z-10 max-w-full truncate text-left text-lg font-semibold">{name}</p>
+                <div class="relative z-10 mt-2 text-left">
+                    <h2 class="text-xs font-semibold uppercase tracking-wide text-surface-600-400">Bio</h2>
+                    {#if bio}
+                        <p class="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-sm text-surface-700-300">{bio}</p>
+                    {:else}
+                        <p class="mt-1 text-sm text-surface-600-400">-</p>
+                    {/if}
+                </div>
             </div>
         </Popover.Content>
     </Popover.Portal>

@@ -24,6 +24,8 @@ const getUserAsUser = mock(async (_currentUserId: string, targetUserId: string) 
     name: 'Test User',
     image: null,
     createdAt: profileCreatedAt,
+    bio: null,
+    accentColor: '#6366f1',
 }));
 const getActivityFeed = mock<ActivityFeedService['getFeed']>(async () => ok({ items: [], nextCursor: null }));
 
@@ -35,6 +37,7 @@ function makeTestApp() {
         userService: {
             getUserAsUser,
             listUsers: async () => [],
+            updateProfile: async (_userId, profile) => ok(profile),
         },
         activityFeedService: { getFeed: getActivityFeed },
         discussionsService: {} as AppDependencies['discussionsService'],
@@ -192,6 +195,8 @@ describe('backend HTTP app', () => {
             emailVerified: true,
             image: null,
             createdAt: profileCreatedAt.toISOString(),
+            bio: null,
+            accentColor: '#6366f1',
             isAdmin: false,
         });
         expect(getUserAsUser).toHaveBeenCalledWith('user-1', 'user-1');
@@ -209,6 +214,8 @@ describe('backend HTTP app', () => {
             emailVerified: true,
             image: null,
             createdAt: profileCreatedAt.toISOString(),
+            bio: null,
+            accentColor: '#6366f1',
             isAdmin: true,
         });
     });
@@ -234,6 +241,8 @@ describe('backend HTTP app', () => {
             name: 'Test User',
             image: null,
             createdAt: profileCreatedAt.toISOString(),
+            bio: null,
+            accentColor: '#6366f1',
             isAdmin: false,
         });
         expect(getUserAsUser).toHaveBeenCalledWith('user-1', 'user-2');
