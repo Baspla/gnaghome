@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Label, Popover } from 'bits-ui';
     import { Heart, Search, Smile } from '@lucide/svelte';
+    import Button from '$lib/components/Button.svelte';
     import { getCustomEmojis } from '$lib/custom-emoji-catalog.svelte';
     import InlineText from '$lib/components/InlineText.svelte';
 
@@ -22,7 +23,7 @@
         contentZIndex = 'z-50',
         triggerIcon = 'smile',
         triggerCount,
-        triggerClass = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-100-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+        triggerClass = 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 transition-colors hover:bg-surface-100-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
     }: Props = $props();
     let open = $state(false);
     let searchQuery = $state('');
@@ -114,7 +115,8 @@
                         <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
                             {#if filteredEmojis.length > 0}
                                 {#each filteredEmojis as emoji (emoji.value)}
-                                    <button
+                                    <Button
+                                        variant="unstyled"
                                         type="button"
                                         class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
                                         aria-label={`${emoji.label} einfügen`}
@@ -122,7 +124,7 @@
                                         onclick={() => chooseEmoji(emoji)}
                                     >
                                         {emoji.value}
-                                    </button>
+                                    </Button>
                                 {/each}
                             {:else}
                                 <p class="col-span-full px-1 py-2 text-sm text-surface-600-400">Keine passenden Emojis gefunden.</p>
@@ -136,7 +138,8 @@
                         {:else}
                             <div class="grid grid-cols-5 gap-1 sm:grid-cols-6">
                                 {#each filteredCustomEmojis as emoji (emoji.name)}
-                                    <button
+                                    <Button
+                                        variant="unstyled"
                                         type="button"
                                         class="flex h-9 items-center justify-center rounded-lg text-xl leading-none hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:text-2xl"
                                         aria-label={`${emoji.name} einfügen`}
@@ -144,7 +147,7 @@
                                         onclick={() => { onSelect(`:${emoji.name}:`); searchQuery = ''; open = false; }}
                                     >
                                         <img src={emoji.url} alt="" class="h-[1em] w-[1em] object-contain" />
-                                    </button>
+                                    </Button>
                                 {/each}
                             </div>
                         {/if}

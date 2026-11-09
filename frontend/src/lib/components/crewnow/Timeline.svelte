@@ -157,7 +157,7 @@
 
     <div bind:this={sentinel} class="flex min-h-12 justify-center py-3" aria-live="polite">
         {#if loadingMore}<span class="text-sm text-surface-600-400">Weitere CrewNows werden geladen …</span>
-        {:else if nextCursor}<button type="button" class="text-sm text-primary-700-300 underline" onclick={() => void loadPage(true)}>Weitere CrewNows laden</button>
+        {:else if nextCursor}<Button variant="unstyled" type="button" class="text-sm text-primary-700-300 underline" onclick={() => void loadPage(true)}>Weitere CrewNows laden</Button>
         {:else if posts.length > 0}<span class="text-sm text-surface-600-400">Du hast das Ende erreicht.</span>{/if}
     </div>
 </section>
@@ -170,7 +170,7 @@
             {#if errorMessage}<p class="mt-3 text-sm text-error-700-300" role="alert">{errorMessage}</p>{/if}
             <div class="mt-6 flex justify-end gap-3">
                 <Button type="button" variant="outlined" disabled={deleting} onclick={() => deleteTarget = null}>Abbrechen</Button>
-                <Button type="button" disabled={deleting} class="bg-error-500 text-error-contrast-500" onclick={() => void confirmDelete()}>{deleting ? 'Wird gelöscht …' : 'Endgültig löschen'}</Button>
+                <Button type="button" variant="error" disabled={deleting} onclick={() => void confirmDelete()}>{deleting ? 'Wird gelöscht …' : 'Endgültig löschen'}</Button>
             </div>
         </div>
     </div>

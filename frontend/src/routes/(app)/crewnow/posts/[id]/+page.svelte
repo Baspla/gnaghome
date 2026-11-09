@@ -113,7 +113,7 @@
             {#if errorMessage}<p class="mt-3 text-sm text-error-700-300" role="alert">{errorMessage}</p>{/if}
             <div class="mt-6 flex justify-end gap-3">
                 <Button type="button" variant="outlined" disabled={deleting} onclick={() => showDeleteDialog = false}>Abbrechen</Button>
-                <Button type="button" disabled={deleting} class="bg-error-500 text-error-contrast-500" onclick={() => void deletePost()}>{deleting ? 'Wird gelöscht …' : 'Endgültig löschen'}</Button>
+                <Button type="button" variant="error" disabled={deleting} onclick={() => void deletePost()}>{deleting ? 'Wird gelöscht …' : 'Endgültig löschen'}</Button>
             </div>
         </div>
     </div>

@@ -4,7 +4,7 @@
 
     type Props = WithoutChildren<Button.RootProps> & {
         children: import("svelte").Snippet;
-        variant?: "primary" | "outlined";
+        variant?: "primary" | "outlined" | "error" | "outlined-error" | "unstyled";
     };
 
     let {
@@ -15,8 +15,16 @@
     }: Props = $props();
 
     const classes = $derived([
-        "btn",
-        variant === "primary" ? "preset-filled" : "preset-outlined",
+        "enabled:cursor-pointer disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors",
+        variant === "primary"
+            ? "btn preset-filled enabled:hover:bg-primary-600-400"
+            : variant === "outlined"
+                ? "btn preset-outlined enabled:hover:bg-surface-200-800"
+                : variant === "error"
+                    ? "btn preset-filled-error-500 enabled:hover:bg-error-600-400"
+                    : variant === "outlined-error"
+                        ? "btn preset-outlined-error-500 enabled:hover:bg-error-200-800"
+                        : "",
         className,
     ]);
 </script>

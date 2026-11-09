@@ -1,4 +1,5 @@
 <script lang="ts">
+    import Button from '$lib/components/Button.svelte';
     import InlineText from '$lib/components/InlineText.svelte';
     import PostReactions from './PostReactions.svelte';
     type Props = {
@@ -70,16 +71,18 @@
             oncontextmenu={(event) => event.preventDefault()}
         />
         {#if overlayImage}
-            <button
+            <Button
+                variant="unstyled"
                 type="button"
-                class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg transition-opacity"
-                class:opacity-0={overlayHidden}
-                class:pointer-events-none={overlayHidden}
+                class={[
+                    'absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg transition-opacity',
+                    overlayHidden && 'opacity-0 pointer-events-none',
+                ]}
                 aria-label="Vorder- und Rückkamera-Bilder vertauschen"
                 onclick={swapImages}
             >
                 <img src={overlayImage} alt="Vorderkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
-            </button>
+            </Button>
         {/if}
         <div class="absolute bottom-3 right-3 z-10">
             <PostReactions {postId} count={reactionCount} {reactionEmoji} onReactionsChange={onReactionsChange} />

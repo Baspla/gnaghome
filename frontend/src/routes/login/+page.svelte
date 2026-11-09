@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { createLogger } from "$lib/logger";
+  import Button from "$lib/components/Button.svelte";
 
   const logger = createLogger("login");
 
@@ -27,8 +28,8 @@
     <div class="flex flex-col items-center gap-6">
       <div class="text-center">
         <h1 class="text-2xl font-bold mb-3">Hallo!</h1>
-        <button onclick={login} class="bg-primary-300-700 text-primary-contrast-300-700 px-4 py-2 rounded-lg shadow-lg shadow-primary-300-700/50 font-semibold">
-          Login mit {env.PUBLIC_GNAGHOME_OAUTH_PROVIDER_ID || "Gnagplus"}</button>
+        <Button onclick={login} class="bg-primary-300-700 text-primary-contrast-300-700 px-4 py-2 rounded-lg shadow-lg shadow-primary-300-700/50 font-semibold">
+          Login mit {env.PUBLIC_GNAGHOME_OAUTH_PROVIDER_ID || "Gnagplus"}</Button>
       </div>
     </div>
   </div>

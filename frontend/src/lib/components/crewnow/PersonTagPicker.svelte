@@ -1,5 +1,6 @@
 <script lang="ts">
     import { api } from '$lib/api';
+    import Button from '$lib/components/Button.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
 
     type Person = { id: string; name: string; image: string | null };
@@ -72,7 +73,7 @@
                             {:else}
                                 <span>{id}</span>
                             {/if}
-                            <button type="button" class="rounded-full px-1 hover:bg-primary-200-800" aria-label={`Markierung entfernen${selectedPerson ? `: ${selectedPerson.name}` : ''}`} onclick={() => toggle(id)}>×</button>
+                            <Button variant="unstyled" type="button" class="rounded-full px-1 hover:bg-primary-200-800" aria-label={`Markierung entfernen${selectedPerson ? `: ${selectedPerson.name}` : ''}`} onclick={() => toggle(id)}>×</Button>
                         </li>
                     {/each}
                 </ul>
@@ -90,7 +91,8 @@
                         {#each people as person (person.id)}
                             <li class="flex items-center gap-3 px-3 py-2 text-surface-900-100">
                                 <ProfilePicture userId={person.id} image={person.image} name={person.name} size="h-9 w-9" />
-                                <button
+                                <Button
+                                    variant="unstyled"
                                     type="button"
                                     aria-pressed={selectedIds.includes(person.id)}
                                     onclick={() => toggle(person.id)}
@@ -98,7 +100,7 @@
                                 >
                                     <span class="min-w-0 flex-1 truncate">{person.name}</span>
                                     <span aria-hidden="true" class="text-sm text-primary-700-300">{selectedIds.includes(person.id) ? 'Markiert' : 'Markieren'}</span>
-                                </button>
+                                </Button>
                             </li>
                         {/each}
                     </ul>

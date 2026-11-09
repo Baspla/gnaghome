@@ -13,6 +13,7 @@
     import Users from "@lucide/svelte/icons/users";
     import Smile from "@lucide/svelte/icons/smile";
     import { api } from "$lib/api";
+    import Button from '$lib/components/Button.svelte';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
@@ -192,7 +193,8 @@
 <div class="flex h-[min(70vh,36rem)] min-h-0 flex-col gap-3 md:flex-row md:gap-4">
     <nav aria-label="Einstellungen" class="flex w-full shrink-0 gap-1 overflow-x-auto pb-2 md:w-48 md:flex-col md:overflow-x-visible md:pb-0">
         {#each sections as section (section.id)}
-            <button
+            <Button
+                variant="unstyled"
                 type="button"
                 aria-pressed={activeSection === section.id}
                 class="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors
@@ -203,13 +205,14 @@
             >
                 <section.icon class="h-4 w-4" />
                 {section.label}
-            </button>
+            </Button>
         {/each}
         {#if user?.isAdmin}
             <div class="mx-1 my-1 h-8 w-px shrink-0 bg-surface-300-700 md:mx-0 md:my-2 md:h-px md:w-full"></div>
             <div class="flex shrink-0 gap-1 md:flex-col">
                 <p class="shrink-0 self-center px-2 text-xs font-semibold uppercase tracking-wide text-surface-contrast-400-800 md:self-start md:px-3 md:pb-1">Administration</p>
-                <button
+                <Button
+                    variant="unstyled"
                     type="button"
                     aria-pressed={activeSection === "users"}
                     class="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors
@@ -220,8 +223,9 @@
                 >
                     <Users class="h-4 w-4" />
                     Benutzer
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="unstyled"
                     type="button"
                     aria-pressed={activeSection === "custom-emojis"}
                     class="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors
@@ -232,7 +236,7 @@
                 >
                     <Smile class="h-4 w-4" />
                     Custom Emoji
-                </button>
+                </Button>
             </div>
         {/if}
     </nav>
@@ -288,12 +292,12 @@
                         </div>
                         {#if profileError}<p class="text-sm text-error-700-300" role="alert">{profileError}</p>{/if}
                         {#if profileSuccess}<p class="text-sm text-success-700-300" role="status">{profileSuccess}</p>{/if}
-                        <button type="submit" class="btn preset-filled-primary-500 self-start" disabled={profileSaving}>
+                        <Button type="submit" class="preset-filled-primary-500 self-start" disabled={profileSaving}>
                             {profileSaving ? 'Wird gespeichert …' : 'Profil speichern'}
-                        </button>
+                        </Button>
                     {/if}
                 </form>
-                <button type="button" class="btn preset-outlined-error-500 self-center" onclick={logout}>Abmelden</button>
+                <Button type="button" variant="outlined-error" class="self-center" onclick={logout}>Abmelden</Button>
                 <p class="text-center text-xs text-surface-contrast-400-800">Version {__APP_VERSION__}</p>
             </div>
         {:else if activeSection === "appearance"}
@@ -303,14 +307,15 @@
                     <p class="text-sm text-surface-contrast-400-800">Helles, dunkles oder systemabhängiges Erscheinungsbild auswählen.</p>
                     <div class="mt-2 grid grid-cols-3 gap-1 rounded-md bg-surface-100-900 p-1">
                         {#each THEME_MODES as modeOption (modeOption.id)}
-                            <button
+                            <Button
+                                variant="unstyled"
                                 class="flex items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors
                                     {themeManager.mode === modeOption.id ? 'bg-primary-500 text-primary-contrast-500' : 'hover:bg-surface-200-800'}"
                                 onclick={() => themeManager.mode = modeOption.id}
                             >
                                 {#if modeOption.id === "light"}<Sun class="h-4 w-4" />{:else if modeOption.id === "dark"}<Moon class="h-4 w-4" />{:else}<Monitor class="h-4 w-4" />{/if}
                                 {modeOption.label}
-                            </button>
+                            </Button>
                         {/each}
                     </div>
                 </div>
@@ -320,7 +325,8 @@
                     <p class="text-sm text-surface-contrast-400-800">Farbschema der Anwendung auswählen.</p>
                     <div class="mt-2 grid grid-cols-3 gap-2">
                         {#each THEMES as themeOption (themeOption.id)}
-                            <button
+                            <Button
+                                variant="unstyled"
                                 class="flex flex-col gap-1.5 rounded-md border p-2 text-left text-sm transition-colors
                                     {themeManager.theme === themeOption.id ? 'border-primary-500 ring-1 ring-primary-500' : 'border-surface-200-800 hover:border-surface-400-600'}"
                                 onclick={() => themeManager.theme = themeOption.id}
@@ -331,7 +337,7 @@
                                     <span class="flex-1 bg-surface-500"></span>
                                 </span>
                                 {themeOption.label}
-                            </button>
+                            </Button>
                         {/each}
                     </div>
                 </div>
@@ -358,7 +364,7 @@
                         <span class="text-xs text-surface-contrast-400-800">PNG, JPEG, GIF, WebP, AVIF oder APNG; maximal 10 MB. Animation bleibt erhalten.</span>
                     </label>
                     <div class="flex justify-end">
-                        <button class="btn preset-filled" type="submit" disabled={customEmojiBusy || !customEmojiFile}>{customEmojiBusy ? 'Wird gespeichert …' : 'Emoji hinzufügen'}</button>
+                        <Button type="submit" disabled={customEmojiBusy || !customEmojiFile}>{customEmojiBusy ? 'Wird gespeichert …' : 'Emoji hinzufügen'}</Button>
                     </div>
                 </form>
                 {#if customEmojiError}<p class="text-sm text-error-700-300" role="alert">{customEmojiError}</p>{/if}
@@ -394,7 +400,7 @@
                                         {new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(emoji.createdAt))}
                                     </time>
                                 </div>
-                                <button type="button" class="btn preset-outlined-error" disabled={customEmojiBusy} onclick={() => void deleteCustomEmoji(emoji.name)}>Löschen</button>
+                                <Button type="button" variant="outlined-error" disabled={customEmojiBusy} onclick={() => void deleteCustomEmoji(emoji.name)}>Löschen</Button>
                             </li>
                         {/each}
                     </ul>
@@ -410,7 +416,7 @@
                 {:else if adminUsersError}
                     <div class="flex flex-wrap items-center gap-3" role="alert">
                         <p class="text-sm text-error-700-300">Die Benutzerliste konnte nicht geladen werden.</p>
-                        <button type="button" class="btn preset-outlined" onclick={() => void loadAdminUsers()}>Erneut versuchen</button>
+                        <Button type="button" variant="outlined" onclick={() => void loadAdminUsers()}>Erneut versuchen</Button>
                     </div>
                 {:else if adminUsers.length === 0}
                     <p class="text-sm text-surface-contrast-400-800">Es sind keine Benutzer vorhanden.</p>

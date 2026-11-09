@@ -46,15 +46,15 @@
       {@render children?.()}
       <div class="flex w-full justify-end gap-2 mt-4">
         <AlertDialog.Cancel
-          class="btn preset-outlined"
+          class="btn preset-outlined enabled:cursor-pointer disabled:cursor-not-allowed transition-colors enabled:hover:bg-surface-200-800"
         >
           {cancelLabel}
         </AlertDialog.Cancel>
         <AlertDialog.Action
           onclick={onAction}
           class={variant === "error"
-            ? "btn preset-filled-error-500"
-            : "btn preset-filled"}
+            ? "btn preset-filled-error-500 enabled:cursor-pointer disabled:cursor-not-allowed transition-colors enabled:hover:bg-error-600-400"
+            : "btn preset-filled enabled:cursor-pointer disabled:cursor-not-allowed transition-colors enabled:hover:bg-primary-600-400"}
         >
           {actionLabel}
         </AlertDialog.Action>

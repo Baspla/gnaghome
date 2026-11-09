@@ -2,6 +2,4 @@
 </script>
 
 
-<button>
-    <a href="/">Schließen</a>
-</button>
+<a href="/" class="btn preset-outlined enabled:cursor-pointer transition-colors enabled:hover:bg-surface-200-800">Schließen</a>

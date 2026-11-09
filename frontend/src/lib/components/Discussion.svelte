@@ -177,12 +177,12 @@
                             </div>
                             {#if message.canEdit && message.author.id === currentUserId && activeEditId !== message.id}
                                 <div class="-mr-2 -mt-2 flex shrink-0 gap-1">
-                                    <button type="button" class="rounded-lg p-2 text-primary-700-300 hover:bg-surface-100-900/50" aria-label="Kommentar bearbeiten" title="Kommentar bearbeiten" onclick={() => startEdit(message)}>
+                                    <Button variant="unstyled" type="button" class="rounded-lg p-2 text-primary-700-300 hover:bg-surface-100-900/50" aria-label="Kommentar bearbeiten" title="Kommentar bearbeiten" onclick={() => startEdit(message)}>
                                         <SquarePen class="h-4 w-4" aria-hidden="true" />
-                                    </button>
-                                    <button type="button" class="rounded-lg p-2 text-error-700-300 hover:bg-error-100-900 disabled:opacity-50" aria-label="Kommentar löschen" title={deletingId === message.id ? 'Wird gelöscht …' : 'Kommentar löschen'} disabled={deletingId === message.id} onclick={() => void deleteMessage(message.id)}>
+                                    </Button>
+                                    <Button variant="unstyled" type="button" class="rounded-lg p-2 text-error-700-300 hover:bg-error-100-900 disabled:opacity-50" aria-label="Kommentar löschen" title={deletingId === message.id ? 'Wird gelöscht …' : 'Kommentar löschen'} disabled={deletingId === message.id} onclick={() => void deleteMessage(message.id)}>
                                         <Trash class="h-4 w-4" aria-hidden="true" />
-                                    </button>
+                                    </Button>
                                 </div>
                             {/if}
                         </div>

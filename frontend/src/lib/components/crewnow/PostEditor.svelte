@@ -557,10 +557,9 @@
             <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
                 <h2 class="text-lg font-semibold text-surface-950-50">Vorschau</h2>
                 <div class="relative aspect-3/4 w-full overflow-hidden rounded-xl bg-surface-950">
-                    <img src={primaryPhoto} alt={isShowingBack ? 'Rückkamera-Aufnahme' : 'Frontkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
-                    <button type="button" class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
+                    <Button variant="unstyled" type="button" class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
                         <img src={smallPhoto} alt={isShowingBack ? 'Frontkamera-Aufnahme' : 'Rückkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
-                    </button>
+                    </Button>
                 </div>
                 <div class="flex justify-center">
                     <Button type="button" variant="outlined" onclick={retake} disabled={isSubmitting}>Neu aufnehmen</Button>
