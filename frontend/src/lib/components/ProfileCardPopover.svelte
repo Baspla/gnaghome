@@ -5,6 +5,7 @@
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
+    import InlineText from '$lib/components/InlineText.svelte';
 
     type Props = {
         userId: string;
@@ -99,7 +100,7 @@
                 <div class="relative z-10 mt-2 text-left">
                     <h2 class="text-xs font-semibold uppercase tracking-wide text-surface-600-400">Bio</h2>
                     {#if bio}
-                        <p class="mt-1 line-clamp-3 whitespace-pre-wrap break-words text-sm text-surface-700-300">{bio}</p>
+                        <p class="mt-1 line-clamp-3 whitespace-pre-wrap wrap-break-word text-sm text-surface-700-300"><InlineText text={bio} /></p>
                     {:else}
                         <p class="mt-1 text-sm text-surface-600-400">-</p>
                     {/if}

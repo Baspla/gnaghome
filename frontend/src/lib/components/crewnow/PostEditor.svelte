@@ -523,15 +523,15 @@
             </section>
         {:else if currentStep === 'preview'}
             <section class="space-y-4 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
-                <div class="relative mx-auto w-full aspect-[3/4] overflow-hidden rounded-xl bg-surface-950">
+                <div class="relative mx-auto w-full aspect-3/4 overflow-hidden rounded-xl bg-surface-950">
                     {#if firstCaptureFacing === 'environment'}
                         <img src={backPreviewUrl} alt="Rückkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
-                        <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
+                        <div class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
                             <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
                         </div>
                     {:else if firstCaptureFacing === 'user'}
                         <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
-                        <div class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
+                        <div class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
                             <img src={frontPreviewUrl} alt="Frontkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
                         </div>
                     {:else}
@@ -556,9 +556,9 @@
         {:else}
             <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
                 <h2 class="text-lg font-semibold text-surface-950-50">Vorschau</h2>
-                <div class="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-surface-950">
+                <div class="relative aspect-3/4 w-full overflow-hidden rounded-xl bg-surface-950">
                     <img src={primaryPhoto} alt={isShowingBack ? 'Rückkamera-Aufnahme' : 'Frontkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
-                    <button type="button" class="absolute right-3 top-3 aspect-[3/4] w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
+                    <button type="button" class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg" aria-label="Vorder- und Rückkamera-Bilder vertauschen" onclick={() => isShowingBack = !isShowingBack}>
                         <img src={smallPhoto} alt={isShowingBack ? 'Frontkamera-Aufnahme' : 'Rückkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
                     </button>
                 </div>

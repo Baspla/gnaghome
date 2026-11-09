@@ -4,6 +4,7 @@
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
+    import InlineText from '$lib/components/InlineText.svelte';
 
     let { data }: PageProps = $props();
     let refreshedProfile = $state<{ id: string; bio: string | null; accentColor: string } | null>(null);
@@ -66,7 +67,7 @@
             <div class="max-w-prose text-left w-full">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-surface-600-400">Bio</h2>
                 {#if profile.bio}
-                    <p class="mt-1 whitespace-pre-wrap break-words text-surface-800-200">{profile.bio}</p>
+                    <p class="mt-1 whitespace-pre-wrap wrap-break-word text-surface-800-200"><InlineText text={profile.bio} /></p>
                 {:else}
                     <p class="mt-1 text-sm text-surface-600-400">-</p>
                 {/if}

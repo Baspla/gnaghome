@@ -196,7 +196,7 @@
                                 </div>
                             </form>
                         {:else}
-                            <InlineText text={message.body} class="mt-1 whitespace-pre-wrap break-words text-sm text-surface-800-200" />
+                            <InlineText text={message.body} class="mt-1 whitespace-pre-wrap wrap-break-word text-sm text-surface-800-200" />
                         {/if}
                     </div>
                 </li>

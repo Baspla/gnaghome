@@ -101,7 +101,7 @@
             side="top"
             align="end"
             sideOffset={8}
-            class="z-[70] w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-surface-300-700/60 bg-surface-50-950 p-4 text-surface-950-50 shadow-xl outline-none"
+            class="z-70 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-surface-300-700/60 bg-surface-50-950 p-4 text-surface-950-50 shadow-xl outline-none"
         >
             <div class="flex items-center justify-between gap-3">
                 <h2 class="font-semibold">Reaktionen <span class="text-sm font-normal text-surface-600-400">({count})</span></h2>

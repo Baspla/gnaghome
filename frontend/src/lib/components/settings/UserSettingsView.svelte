@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { authClient } from "$lib/auth-client";
     import { page } from "$app/state";
     import { THEMES, THEME_MODES, themeManager } from "$lib/settings/theme.svelte";
@@ -13,6 +13,7 @@
     import Users from "@lucide/svelte/icons/users";
     import Smile from "@lucide/svelte/icons/smile";
     import { api } from "$lib/api";
+    import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
     import CrewNowPreferences from "./CrewNowPreferences.svelte";
@@ -39,6 +40,7 @@
     let customEmojiError = $state<string | null>(null);
     let customEmojiSuccess = $state<string | null>(null);
     let profileBio = $state('');
+    let profileBioTextarea: HTMLTextAreaElement | undefined = $state();
     let profileAccentColor = $state('#6366f1');
     let profileLoading = $state(true);
     let profileSaving = $state(false);
@@ -77,6 +79,21 @@
         } finally {
             profileSaving = false;
         }
+    }
+
+    async function insertBioEmoji(emoji: string) {
+        const textarea = profileBioTextarea;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        if (profileBio.length - (end - start) + emoji.length > 300) return;
+
+        textarea.setRangeText(emoji, start, end, 'end');
+        profileBio = textarea.value;
+        await tick();
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
     }
 
     onMount(() => {
@@ -244,13 +261,17 @@
                             <label for="profile-bio" class="font-medium">Beschreibung</label>
                             <textarea
                                 id="profile-bio"
+                                bind:this={profileBioTextarea}
                                 bind:value={profileBio}
                                 maxlength="300"
                                 rows="4"
                                 placeholder="Erzähl etwas über dich …"
                                 class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-surface-950-50 placeholder:text-surface-500-500 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/40"
                             ></textarea>
-                            <p class="text-right text-xs text-surface-600-400">{profileBio.length}/300 Zeichen</p>
+                            <div class="flex items-center justify-between gap-3">
+                                <EmojiPicker onSelect={(emoji) => void insertBioEmoji(emoji)} />
+                                <p class="text-right text-xs text-surface-600-400">{profileBio.length}/300 Zeichen</p>
+                            </div>
                         </div>
                         <div class="flex items-center justify-between gap-4 rounded-lg border border-surface-300-700 p-3">
                             <div>
