@@ -100,6 +100,8 @@
         <Popover.Content
             side="top"
             align="end"
+            
+            onCloseAutoFocus={(event) => event.preventDefault()}
             sideOffset={8}
             class="z-70 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-surface-300-700/60 bg-surface-50-950 p-4 text-surface-950-50 shadow-xl outline-none"
         >

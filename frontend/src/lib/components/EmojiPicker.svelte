@@ -91,6 +91,8 @@
     </Popover.Trigger>
     <Popover.Portal>
         <Popover.Content
+        
+            onCloseAutoFocus={(event) => event.preventDefault()}
             class={`${contentZIndex} w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-surface-300-700 bg-surface-50-950 p-3 shadow-lg`}
             align="start"
             sideOffset={8}

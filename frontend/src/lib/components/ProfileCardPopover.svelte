@@ -167,6 +167,7 @@
     </Popover.Trigger>
     <Popover.Portal>
         <Popover.Content
+            onCloseAutoFocus={(event) => event.preventDefault()}
             side="bottom"
             align="start"
             alignOffset={-40}
