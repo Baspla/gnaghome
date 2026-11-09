@@ -11,7 +11,7 @@
 </script>
 
 <aside
-    class="order-last flex h-16 w-full shrink-0 items-center gap-2 overflow-hidden border-t border-surface-300-700/30 bg-surface-100-900 p-2 md:order-first md:h-full md:w-16 md:flex-col md:gap-3 md:border-r md:border-t-0 md:p-3"
+    class="order-last flex h-16 w-full shrink-0 items-center gap-2 overflow-hidden border-t border-surface-300-700/30 bg-surface-100-900/35 p-2 md:order-first md:h-full md:w-16 md:flex-col md:gap-3 md:border-r md:border-t-0 md:p-3"
 >
     <nav
         aria-label="Primary navigation"

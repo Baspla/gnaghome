@@ -22,7 +22,7 @@
         contentZIndex = 'z-50',
         triggerIcon = 'smile',
         triggerCount,
-        triggerClass = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+        triggerClass = 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-surface-700-300 hover:bg-surface-100-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
     }: Props = $props();
     let open = $state(false);
     let searchQuery = $state('');

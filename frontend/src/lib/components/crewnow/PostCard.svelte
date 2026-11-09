@@ -38,7 +38,7 @@
     }
 </script>
 
-<article class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900 shadow-sm">
+<article class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 shadow-sm">
     <div class="flex items-center gap-3 px-4 py-4 sm:px-5">
         <ProfilePicture userId={post.author.id} image={post.author.image} name={post.author.name} size="h-10 w-10" />
         <div class="min-w-0 flex-1">
@@ -52,7 +52,7 @@
         {#if !hideOpenButton}
             <a
                 href={`/crewnow/posts/${encodeURIComponent(post.id)}`}
-                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800"
+                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800/50"
                 aria-label={`${post.commentCount} ${post.commentCount === 1 ? 'Kommentar' : 'Kommentare'}`}
             ><MessageCircle class="h-4 w-4" aria-hidden="true" /><span>{post.commentCount}</span></a>
         {/if}

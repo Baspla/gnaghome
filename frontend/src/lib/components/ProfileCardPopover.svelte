@@ -83,7 +83,7 @@
             </div>
             <div class="relative -mt-10 min-h-24 overflow-hidden rounded-2xl border border-surface-300-700/60 bg-surface-50-950 px-5 pb-5 pt-12 text-surface-950-50 shadow-xl">
                 <div
-                    class="pointer-events-none absolute inset-x-0 top-0 h-12"
+                    class="pointer-events-none absolute inset-x-0 top-0 h-12 opacity-50"
                     style:background={`linear-gradient(to bottom, ${accentColor}, transparent)`}
                     aria-hidden="true"
                 ></div>
@@ -91,7 +91,7 @@
                     href={`/profile/${encodeURIComponent(userId)}`}
                     aria-label={`Profil von ${name} öffnen`}
                     title="Profil öffnen"
-                    class="absolute right-2 top-2 inline-flex rounded-lg p-2 text-primary-700-300 transition-colors hover:bg-surface-200-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    class="absolute right-2 top-2 inline-flex rounded-lg p-2 text-primary-700-300 transition-colors hover:bg-surface-100-900/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                     <ArrowUpRight class="h-4 w-4" aria-hidden="true" />
                 </a>

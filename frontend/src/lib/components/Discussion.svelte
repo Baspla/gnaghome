@@ -132,7 +132,7 @@
     });
 </script>
 
-<section id="comments" class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4 sm:p-5" aria-labelledby="discussion-heading">
+<section id="comments" class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4 sm:p-5" aria-labelledby="discussion-heading">
     <h2 id="discussion-heading" class="text-lg font-semibold text-surface-950-50">Kommentare <span class="text-sm font-normal text-surface-600-400">({messages.length})</span></h2>
 
     <form class="mt-4 flex flex-col gap-3" onsubmit={submitComment}>
@@ -177,7 +177,7 @@
                             </div>
                             {#if message.canEdit && message.author.id === currentUserId && activeEditId !== message.id}
                                 <div class="-mr-2 -mt-2 flex shrink-0 gap-1">
-                                    <button type="button" class="rounded-lg p-2 text-primary-700-300 hover:bg-surface-200-800" aria-label="Kommentar bearbeiten" title="Kommentar bearbeiten" onclick={() => startEdit(message)}>
+                                    <button type="button" class="rounded-lg p-2 text-primary-700-300 hover:bg-surface-100-900/50" aria-label="Kommentar bearbeiten" title="Kommentar bearbeiten" onclick={() => startEdit(message)}>
                                         <SquarePen class="h-4 w-4" aria-hidden="true" />
                                     </button>
                                     <button type="button" class="rounded-lg p-2 text-error-700-300 hover:bg-error-100-900 disabled:opacity-50" aria-label="Kommentar löschen" title={deletingId === message.id ? 'Wird gelöscht …' : 'Kommentar löschen'} disabled={deletingId === message.id} onclick={() => void deleteMessage(message.id)}>

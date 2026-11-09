@@ -125,7 +125,7 @@
         <PageHeading title="Aktivitäten" />
     </header>
 
-    <section class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900" aria-label="Aktivitätsliste">
+    <section class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30" aria-label="Aktivitätsliste">
         {#if loading}
             <p class="px-6 py-12 text-center text-surface-600-400" role="status">Aktivitäten werden geladen …</p>
         {:else if activities.length === 0 && !errorMessage}

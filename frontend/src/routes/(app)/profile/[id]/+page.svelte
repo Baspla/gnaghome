@@ -49,9 +49,9 @@
 </svelte:head>
 
 <main class="mx-auto flex min-h-full w-full max-w-2xl items-center justify-center px-4 py-10">
-    <section class="w-full overflow-hidden rounded-3xl border border-surface-300-700/60 bg-surface-50-950 text-center shadow-lg">
+    <section class="w-full overflow-hidden rounded-3xl border border-surface-300-700/60 bg-surface-100-900/30 text-center shadow-lg">
         <div
-            class="h-32"
+            class="h-32 opacity-75"
             style:background={`linear-gradient(to bottom, ${profile.accentColor}, transparent)`}
             aria-hidden="true"
         ></div>
@@ -61,15 +61,14 @@
                 image={profile.image}
                 name={profile.name}
                 size="h-32 w-32 text-4xl"
-                class="border-4 border-surface-50-950"
             />
             <h1 class="text-3xl font-bold text-surface-950-50">{profile.name}</h1>
-            <div class="max-w-prose">
+            <div class="max-w-prose text-left w-full">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-surface-600-400">Bio</h2>
                 {#if profile.bio}
                     <p class="mt-1 whitespace-pre-wrap break-words text-surface-800-200">{profile.bio}</p>
                 {:else}
-                    <p class="mt-1 text-sm text-surface-600-400">Noch keine Beschreibung vorhanden.</p>
+                    <p class="mt-1 text-sm text-surface-600-400">-</p>
                 {/if}
             </div>
             <p class="text-sm text-surface-600-400">Beigetreten am {joinedDate}</p>
