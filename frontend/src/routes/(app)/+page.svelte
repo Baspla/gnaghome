@@ -50,13 +50,7 @@
         if (activity.type === 'crewnow.image_posted' && activity.target?.type === 'crewnow.post') {
             return `/crewnow/posts/${encodeURIComponent(activity.target.id)}`;
         }
-
-        const profileId = activity.target?.type === 'platform.profile'
-            ? activity.target.id
-            : activity.type === 'profile.birthday'
-                ? activity.subject?.id
-                : null;
-        return profileId ? `/profile/${encodeURIComponent(profileId)}` : null;
+        return null;
     }
 
     function activityLinkLabel(activity: Activity): string {
@@ -144,6 +138,7 @@
                         <div class="flex shrink-0 -space-x-2">
                             {#if activity.actor}
                                 <ProfilePicture
+                                    userId={activity.actor.id}
                                     image={activity.actor.image}
                                     name={activity.actor.name}
                                     size="h-10 w-10"
@@ -151,6 +146,7 @@
                                 />
                             {:else if activity.subject}
                                 <ProfilePicture
+                                    userId={activity.subject.id}
                                     image={activity.subject.image}
                                     name={activity.subject.name}
                                     size="h-10 w-10"
@@ -164,12 +160,14 @@
                                     <Username
                                         userId={activity.actor.id}
                                         name={activity.actor.name}
+                                        image={activity.actor.image}
                                         class="font-semibold text-surface-950-50"
                                     />
                                 {:else if activity.subject}
                                     <Username
                                         userId={activity.subject.id}
                                         name={activity.subject.name}
+                                        image={activity.subject.image}
                                         class="font-semibold text-surface-950-50"
                                     />
                                 {/if}
@@ -178,6 +176,7 @@
                                     <Username
                                         userId={activity.subject.id}
                                         name={activity.subject.name}
+                                        image={activity.subject.image}
                                         class="font-semibold text-surface-950-50"
                                     />
                                     <span> aktualisiert.</span>
@@ -199,7 +198,7 @@
                                                         <span>,</span>{' '}
                                                     {/if}
                                                 {/if}
-                                                <Username userId={person.id} name={person.name} class="font-semibold text-surface-950-50" />
+                                                <Username userId={person.id} name={person.name} image={person.image} class="font-semibold text-surface-950-50" />
                                             {/each}
                                         {:else}
                                             <span>{activity.data.taggedUsers.length} Freunden</span>

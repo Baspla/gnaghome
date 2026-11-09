@@ -167,7 +167,7 @@
         <ol class="mt-5 flex flex-col gap-4">
             {#each messages as message (message.id)}
                 <li class="flex gap-3 border-t border-surface-300-700/30 pt-4">
-                    <ProfilePicture image={message.author.image} name={message.author.name} size="h-9 w-9" />
+                    <ProfilePicture userId={message.author.id} image={message.author.image} name={message.author.name} size="h-9 w-9" />
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">

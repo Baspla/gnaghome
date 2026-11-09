@@ -16,6 +16,7 @@
 
 <main class="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center gap-5 px-4 py-10 text-center">
     <ProfilePicture
+        userId={data.profile.id}
         image={data.profile.image}
         name={data.profile.name}
         size="h-32 w-32 text-4xl"

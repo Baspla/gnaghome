@@ -115,7 +115,7 @@
                 <ul class="mt-3 flex max-h-64 flex-col gap-2 overflow-y-auto">
                     {#each reactions as reaction (reaction.id)}
                         <li class="flex items-center gap-2 rounded-xl bg-surface-100-900 px-2 py-2">
-                            <ProfilePicture image={reaction.user.image} name={reaction.user.name} size="h-8 w-8" />
+                            <ProfilePicture userId={reaction.user.id} image={reaction.user.image} name={reaction.user.name} size="h-8 w-8" />
                             <span class="min-w-0 flex-1 truncate text-sm font-medium">{reaction.user.name}</span>
                             <InlineText text={reaction.emoji} class="text-xl leading-none" />
                         </li>

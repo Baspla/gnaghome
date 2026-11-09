@@ -1,5 +1,9 @@
 <script lang="ts">
+    import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
+    import ProfileCardPopover from '$lib/components/ProfileCardPopover.svelte';
+
     type Props = {
+        userId?: string;
         image?: string | null;
         name?: string;
         size?: string;
@@ -7,29 +11,16 @@
     };
 
     let {
+        userId,
         image = null,
         name = "User",
         size = "h-10 w-10",
         class: className,
     }: Props = $props();
-
-    let failedImage = $state<string | null>(null);
-    const initials = $derived(name.trim().charAt(0).toUpperCase() || "?");
 </script>
 
-{#if image && failedImage !== image}
-    <img
-        src={image}
-        alt={name}
-        class={["shrink-0 rounded-full object-cover", size, className]}
-        onerror={() => failedImage = image}
-    />
+{#if userId}
+    <ProfileCardPopover {userId} {image} {name} {size} avatarClass={className} />
 {:else}
-    <span
-        role="img"
-        aria-label={`${name} profile picture`}
-        class={["inline-flex shrink-0 items-center justify-center rounded-full bg-primary-500 font-semibold text-primary-contrast-500", size, className]}
-    >
-        {initials}
-    </span>
+    <ProfileAvatar {image} {name} {size} class={className} />
 {/if}
