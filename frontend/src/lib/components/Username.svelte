@@ -1,16 +1,14 @@
 <script lang="ts">
+    import ProfileCardPopover from '$lib/components/ProfileCardPopover.svelte';
+
     type Props = {
         userId: string;
         name: string;
+        image?: string | null;
         class?: string;
     };
 
-    let { userId, name, class: className }: Props = $props();
+    let { userId, name, image = null, class: className }: Props = $props();
 </script>
 
-<a
-    href={`/profile/${encodeURIComponent(userId)}`}
-    class={["text-primary-700-300 underline-offset-2 hover:underline", className]}
->
-    {name}
-</a>
+<ProfileCardPopover {userId} {name} {image} triggerType="name" class={className} />

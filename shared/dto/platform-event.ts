@@ -63,6 +63,12 @@ export const CrewNowTimelineChangedEventSchema = t.Object({
 });
 export type CrewNowTimelineChangedEvent = typeof CrewNowTimelineChangedEventSchema.static;
 
+export const UserProfileChangedEventSchema = t.Object({
+    ...EventBaseSchema,
+    type: t.Literal('user.profile.changed'),
+});
+export type UserProfileChangedEvent = typeof UserProfileChangedEventSchema.static;
+
 /** Discriminated union of thin, actionable platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
@@ -73,6 +79,7 @@ export const PlatformEventSchema = t.Union([
     CrewNowPreferencesChangedEventSchema,
     CrewNowPostChangedEventSchema,
     CrewNowTimelineChangedEventSchema,
+    UserProfileChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;
@@ -86,4 +93,5 @@ export const PLATFORM_EVENT_TYPES = [
     'crewnow.preferences.changed',
     'crewnow.post.changed',
     'crewnow.timeline.changed',
+    'user.profile.changed',
 ] as const satisfies readonly PlatformEvent['type'][];

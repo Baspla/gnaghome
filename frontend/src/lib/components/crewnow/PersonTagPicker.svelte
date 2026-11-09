@@ -67,7 +67,7 @@
                         {@const selectedPerson = availablePeople.find((person) => person.id === id)}
                         <li class="flex items-center gap-2 rounded-full bg-primary-100-900 px-2 py-1 text-sm text-primary-900-100">
                             {#if selectedPerson}
-                                <ProfilePicture image={selectedPerson.image} name={selectedPerson.name} size="h-6 w-6 text-xs" />
+                                <ProfilePicture userId={selectedPerson.id} image={selectedPerson.image} name={selectedPerson.name} size="h-6 w-6 text-xs" />
                                 <span>{selectedPerson.name}</span>
                             {:else}
                                 <span>{id}</span>
@@ -88,14 +88,14 @@
                 {:else}
                     <ul>
                         {#each people as person (person.id)}
-                            <li>
+                            <li class="flex items-center gap-3 px-3 py-2 text-surface-900-100">
+                                <ProfilePicture userId={person.id} image={person.image} name={person.name} size="h-9 w-9" />
                                 <button
                                     type="button"
                                     aria-pressed={selectedIds.includes(person.id)}
                                     onclick={() => toggle(person.id)}
-                                    class="flex w-full items-center gap-3 px-3 py-2 text-left text-surface-900-100 hover:bg-surface-200-800 aria-pressed:bg-primary-100-900"
+                                    class="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left hover:text-primary-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 >
-                                    <ProfilePicture image={person.image} name={person.name} size="h-9 w-9" />
                                     <span class="min-w-0 flex-1 truncate">{person.name}</span>
                                     <span aria-hidden="true" class="text-sm text-primary-700-300">{selectedIds.includes(person.id) ? 'Markiert' : 'Markieren'}</span>
                                 </button>

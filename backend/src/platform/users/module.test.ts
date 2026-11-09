@@ -69,4 +69,28 @@ describe('users HTTP module', () => {
 
         expect(response.status).toBe(401);
     });
+
+    it('updates only the authenticated user profile and rejects invalid customization', async () => {
+        const response = await app().handle(new Request('http://localhost/users/me', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ bio: 'My bio', accentColor: '#345678' }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ bio: 'My bio', accentColor: '#345678' });
+        expect(await service.getRedactedUserById('viewer')).toMatchObject({
+            ok: true, value: { bio: 'My bio', accentColor: '#345678' },
+        });
+        expect(await service.getRedactedUserById('other')).toMatchObject({
+            ok: true, value: { bio: null, accentColor: '#6366f1' },
+        });
+
+        const invalid = await app().handle(new Request('http://localhost/users/me', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ bio: 'x'.repeat(301), accentColor: '#345678' }),
+        }));
+        expect(invalid.status).toBe(422);
+    });
 });

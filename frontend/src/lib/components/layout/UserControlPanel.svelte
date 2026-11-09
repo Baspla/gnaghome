@@ -19,7 +19,7 @@
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
         <DropdownMenu.Content
-            class="z-50 min-w-48 rounded-lg border border-surface-300-700 bg-surface-50-950 p-1 shadow-lg"
+            class="z-50 min-w-48 rounded-lg border border-surface-300-700 bg-surface-50-950 p-1 shadow-lg ml-1"
             side="top"
             align="end"
             sideOffset={8}

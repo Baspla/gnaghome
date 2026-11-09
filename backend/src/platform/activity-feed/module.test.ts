@@ -29,7 +29,7 @@ describe('activity feed HTTP module', () => {
         }
         const profile = await database.db.select().from(user).where(eq(user.id, targetUserId)).get();
         if (!profile) return err({ status: 404, code: 'NOT_FOUND', message: 'User not found' });
-        return ok(profile);
+        return ok({ ...profile, bio: null, accentColor: '#6366f1' });
     };
 
     function app() {

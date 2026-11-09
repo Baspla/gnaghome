@@ -516,13 +516,13 @@
 <form onsubmit={submitPost} class="mx-auto flex w-full max-w-2xl flex-col gap-6">
     {#if mode === 'create'}
         {#if currentStep === 'inactive'}
-            <section class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-6 text-center">
+            <section class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-6 text-center">
                 <h2 class="text-xl font-semibold text-surface-950-50">Ein neues CrewNow aufnehmen</h2>
                 <p class="mt-2 text-sm text-surface-600-400">Wir nehmen ein Bild mit der Rückkamera und eines mit der Frontkamera auf.</p>
                 <Button type="button" class="mt-5" disabled={preferencesLoading} onclick={() => void startCamera('environment')}>{preferencesLoading ? 'Präferenzen werden geladen …' : 'Kamera aktivieren'}</Button>
             </section>
         {:else if currentStep === 'preview'}
-            <section class="space-y-4 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
+            <section class="space-y-4 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
                 <div class="relative mx-auto w-full aspect-[3/4] overflow-hidden rounded-xl bg-surface-950">
                     {#if firstCaptureFacing === 'environment'}
                         <img src={backPreviewUrl} alt="Rückkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
@@ -554,7 +554,7 @@
                 {/if}
             </section>
         {:else}
-            <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
+            <section class="space-y-6 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
                 <h2 class="text-lg font-semibold text-surface-950-50">Vorschau</h2>
                 <div class="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-surface-950">
                     <img src={primaryPhoto} alt={isShowingBack ? 'Rückkamera-Aufnahme' : 'Frontkamera-Aufnahme'} class="absolute inset-0 block h-full w-full object-cover" />
@@ -577,7 +577,7 @@
             </section>
         {/if}
     {:else}
-        <section class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900 p-4">
+        <section class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4">
             <h2 class="mb-4 text-lg font-semibold text-surface-950-50">Bilder</h2>
             <div class="grid gap-4 sm:grid-cols-2">
                 <div><p class="mb-2 text-sm font-medium text-surface-700-300">Rückkamera</p><img src={backPreviewUrl} alt="Rückkamera-Aufnahme des Posts" class="w-full rounded-xl object-contain" /></div>

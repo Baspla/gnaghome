@@ -52,6 +52,7 @@ describe('PlatformEventSchema', () => {
             'crewnow.preferences.changed',
             'crewnow.post.changed',
             'crewnow.timeline.changed',
+            'user.profile.changed',
         ] as const;
         const actions = ['CREATED', 'UPDATED', 'DELETED'] as const;
 

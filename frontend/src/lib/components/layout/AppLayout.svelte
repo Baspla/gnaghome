@@ -6,7 +6,7 @@
 </script>
 
 <div
-    class="flex h-dvh w-full flex-col overflow-hidden bg-surface-200-800 font-sans text-surface-contrast-200-800 md:flex-row"
+    class="flex h-dvh w-full flex-col overflow-hidden bg-surface-50-950 font-sans text-surface-contrast-50-950 md:flex-row"
 >
     <IconSidebar />
 

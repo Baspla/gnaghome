@@ -38,11 +38,11 @@
     }
 </script>
 
-<article class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900 shadow-sm">
+<article class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 shadow-sm">
     <div class="flex items-center gap-3 px-4 py-4 sm:px-5">
-        <ProfilePicture image={post.author.image} name={post.author.name} size="h-10 w-10" />
+        <ProfilePicture userId={post.author.id} image={post.author.image} name={post.author.name} size="h-10 w-10" />
         <div class="min-w-0 flex-1">
-            <Username userId={post.author.id} name={post.author.name} class="font-semibold text-surface-950-50" />
+            <Username userId={post.author.id} name={post.author.name} image={post.author.image} class="font-semibold text-surface-950-50" />
             {#if formattedDate}
                 <time class="block text-xs text-surface-600-400" datetime={formattedDate.datetime}>{formattedDate.text}</time>
             {:else}
@@ -52,7 +52,7 @@
         {#if !hideOpenButton}
             <a
                 href={`/crewnow/posts/${encodeURIComponent(post.id)}`}
-                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800"
+                class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-primary-700-300 hover:bg-surface-200-800/50"
                 aria-label={`${post.commentCount} ${post.commentCount === 1 ? 'Kommentar' : 'Kommentare'}`}
             ><MessageCircle class="h-4 w-4" aria-hidden="true" /><span>{post.commentCount}</span></a>
         {/if}
@@ -74,8 +74,8 @@
             <ul class="mt-2 flex flex-wrap gap-2">
                 {#each post.taggedUsers as person (person.id)}
                     <li class="flex items-center gap-2 rounded-full bg-primary-100-900 py-1 pl-1 pr-3 text-sm text-primary-900-100">
-                        <ProfilePicture image={person.image} name={person.name} size="h-7 w-7 text-xs" />
-                        <Username userId={person.id} name={person.name} class="font-medium" />
+                        <ProfilePicture userId={person.id} image={person.image} name={person.name} size="h-7 w-7 text-xs" />
+                        <Username userId={person.id} name={person.name} image={person.image} class="font-medium" />
                     </li>
                 {/each}
             </ul>

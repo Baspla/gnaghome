@@ -18,7 +18,7 @@ export function createServices(
     filesDirectory = 'data/files',
     vapid: VapidConfig = {},
 ) {
-    const users = new UserService(db);
+    const users = new UserService(db, broadcast);
     const activityFeed = new ActivityFeedService(db, broadcast);
     const notifications = new NotificationsService(db, createWebPushSender(vapid), undefined, broadcast);
     const discussions = new DiscussionsService(db, broadcast, notifications);

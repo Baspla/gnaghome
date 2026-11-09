@@ -82,14 +82,14 @@
             triggerText=""
             triggerIcon="heart"
             triggerCount={0}
-            triggerClass="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:text-error-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            triggerClass="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:bg-surface-50-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             contentZIndex="z-[80]"
         />
 {:else}
     <Popover.Root bind:open onOpenChange={(isOpen) => { if (isOpen) void refresh(); }}>
         <Popover.Trigger
             type="button"
-            class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950/90 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:text-error-700-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-surface-300-700/60 bg-surface-50-950 px-3 text-sm text-surface-800-200 shadow-md backdrop-blur transition-colors hover:bg-surface-50-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-label={`${count} ${count === 1 ? 'Reaktion' : 'Reaktionen'} anzeigen`}
             title="Reaktionen anzeigen"
         >
@@ -114,8 +114,8 @@
             {:else}
                 <ul class="mt-3 flex max-h-64 flex-col gap-2 overflow-y-auto">
                     {#each reactions as reaction (reaction.id)}
-                        <li class="flex items-center gap-2 rounded-xl bg-surface-100-900 px-2 py-2">
-                            <ProfilePicture image={reaction.user.image} name={reaction.user.name} size="h-8 w-8" />
+                        <li class="flex items-center gap-2 rounded-xl bg-surface-100-900/70 px-2 py-2">
+                            <ProfilePicture userId={reaction.user.id} image={reaction.user.image} name={reaction.user.name} size="h-8 w-8" />
                             <span class="min-w-0 flex-1 truncate text-sm font-medium">{reaction.user.name}</span>
                             <InlineText text={reaction.emoji} class="text-xl leading-none" />
                         </li>

@@ -15,7 +15,7 @@ import { createReactionsModule } from './platform/reactions/module';
 
 const logger = createLogger('app');
 
-type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser' | 'listUsers'>;
+type UserServiceDependency = Pick<import('./platform/users/service').UserService, 'getUserAsUser' | 'listUsers' | 'updateProfile'>;
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 type CustomEmojiServiceDependency = Pick<import('./platform/custom-emoji/service').CustomEmojiService, 'getCatalog' | 'createEmoji' | 'deleteEmoji'>;
