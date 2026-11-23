@@ -2,6 +2,7 @@
     import { setPageTitle } from "$lib/utils";
     import PageHeading from "$lib/components/PageHeading.svelte";
     import Timeline from "$lib/components/crewnow/Timeline.svelte";
+    import Camera from "@lucide/svelte/icons/camera";
 
     setPageTitle("CrewNow");
 </script>
@@ -18,3 +19,12 @@
     </header>
     <Timeline />
 </main>
+
+<a
+    href="/crewnow/create"
+    aria-label="Neuen Post erstellen"
+    title="Neuen Post erstellen"
+    class="btn preset-filled fixed bottom-20 right-5 z-40 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border-0 p-0 shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:bottom-6 md:right-6"
+>
+    <Camera class="h-6 w-6" aria-hidden="true" />
+</a>
