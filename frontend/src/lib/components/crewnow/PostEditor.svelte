@@ -54,6 +54,7 @@
     let cameraZoomTrack: CameraZoomTrack | null = null;
     let zoomRange = $state<CameraZoomRange | null>(null);
     let zoom = $state(1);
+    let isHardwareZoom = $state(false);
     let zoomApplyTimeout: ReturnType<typeof setTimeout> | undefined;
     let createPostId = $state('');
     let firstCaptureFacing = $state<CameraFacing | null>(null);
@@ -78,6 +79,10 @@
 
     const primaryPhoto = $derived(isShowingBack ? backPreviewUrl : frontPreviewUrl);
     const smallPhoto = $derived(isShowingBack ? frontPreviewUrl : backPreviewUrl);
+    const cameraPreviewTransform = $derived([
+        cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : '',
+        !isHardwareZoom && zoom > 1 ? `scale(${zoom})` : '',
+    ].filter(Boolean).join(' ') || 'none');
 
     async function loadPreferences() {
         try {
@@ -112,6 +117,8 @@
         zoomApplyTimeout = undefined;
         cameraZoomTrack = null;
         zoomRange = null;
+        isHardwareZoom = false;
+        zoom = 1;
         cameraStream?.getTracks().forEach((track) => track.stop());
         cameraStream = null;
         if (videoElement) videoElement.srcObject = null;
@@ -151,23 +158,37 @@
 
     function setCameraZoom(track: CameraZoomTrack | undefined) {
         cameraZoomTrack = null;
-        zoomRange = null;
-        if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') return;
+        isHardwareZoom = false;
+        if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') {
+            zoomRange = { min: 1, max: 3, step: 0.1 };
+            zoom = 1;
+            return;
+        }
 
         try {
             const range = track.getCapabilities().zoom;
-            if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return;
+            if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) {
+                zoomRange = { min: 1, max: 3, step: 0.1 };
+                zoom = 1;
+                return;
+            }
 
             cameraZoomTrack = track;
             zoomRange = range;
+            isHardwareZoom = true;
             zoom = Math.min(range.max, Math.max(range.min, track.getSettings().zoom ?? range.min));
         } catch {
-            // Zoom controls are optional; some browsers expose camera streams without track capabilities.
+            // Fall back to digital zoom when hardware capabilities are unavailable.
+            cameraZoomTrack = null;
+            isHardwareZoom = false;
+            zoomRange = { min: 1, max: 3, step: 0.1 };
+            zoom = 1;
         }
     }
 
     function updateCameraZoom(value: number) {
         zoom = value;
+        if (!isHardwareZoom) return;
         const track = cameraZoomTrack;
         if (!track || !zoomRange) return;
 
@@ -176,8 +197,12 @@
             zoomApplyTimeout = undefined;
             if (track !== cameraZoomTrack || track.readyState !== 'live') return;
             void track.applyConstraints({ zoom: value }).catch(() => {
-                // A device can advertise zoom but fail to apply it; do not block camera capture.
-                if (track === cameraZoomTrack) zoomRange = null;
+                // Fall back to the same digital zoom shown by the preview.
+                if (track !== cameraZoomTrack) return;
+                cameraZoomTrack = null;
+                isHardwareZoom = false;
+                zoomRange = { min: 1, max: 3, step: 0.1 };
+                zoom = Math.min(3, Math.max(1, zoom));
             });
         }, 80);
     }
@@ -303,7 +328,7 @@
                 return;
             }
             const canvas = document.createElement('canvas');
-            const crop = getCenteredCropRect(video.videoWidth, video.videoHeight);
+            const crop = getCenteredCropRect(video.videoWidth, video.videoHeight, isHardwareZoom ? 1 : zoom);
             canvas.width = Math.round(crop.width);
             canvas.height = Math.round(crop.height);
             const context = canvas.getContext('2d');
@@ -587,15 +612,15 @@
                     {#if firstCaptureFacing === 'environment'}
                         <img src={backPreviewUrl} alt="Rückkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
                         <div class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
-                            <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
+                        <video bind:this={videoElement} style:transform={cameraPreviewTransform} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Frontkamera"></video>
                         </div>
                     {:else if firstCaptureFacing === 'user'}
-                        <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
+                        <video bind:this={videoElement} style:transform={cameraPreviewTransform} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild der Rückkamera"></video>
                         <div class="absolute right-3 top-3 aspect-3/4 w-[27%] overflow-hidden rounded-xl border-2 border-surface-50-950 shadow-lg">
                             <img src={frontPreviewUrl} alt="Frontkamera-Aufnahme" class="absolute inset-0 block h-full w-full object-cover" />
                         </div>
                     {:else}
-                    <video bind:this={videoElement} style:transform={cameraFacing === 'user' && preferences.mirrorFrontPreview ? 'scaleX(-1)' : 'none'} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
+                    <video bind:this={videoElement} style:transform={cameraPreviewTransform} class="absolute inset-0 block h-full w-full object-cover" autoplay playsinline muted aria-label="Live-Kamerabild"></video>
                     {/if}
                     {#if countdown !== null}
                         <div aria-hidden="true" class="absolute inset-0 z-10 flex items-center justify-center bg-surface-950/30">
@@ -605,14 +630,13 @@
                 </div>
                 {#if zoomRange}
                     <label class="mx-auto flex w-full max-w-sm items-center gap-3 text-sm text-surface-700-300">
-                        <span>Zoom</span>
                         <input
                             type="range"
                             min={zoomRange.min}
                             max={zoomRange.max}
                             step={zoomRange.step ?? 'any'}
                             value={zoom}
-                            aria-label="Kamerazoom"
+                            aria-label={isHardwareZoom ? 'Kamerazoom' : 'Digitaler Zoom'}
                             class="w-full accent-primary-500"
                             oninput={(event) => updateCameraZoom(Number(event.currentTarget.value))}
                         />

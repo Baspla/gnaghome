@@ -6,25 +6,28 @@ export type CropRect = {
 };
 
 /** Returns the centered source crop that fills a 3:4 `object-cover` preview. */
-export function getCenteredCropRect(sourceWidth: number, sourceHeight: number): CropRect {
+export function getCenteredCropRect(sourceWidth: number, sourceHeight: number, zoom = 1): CropRect {
     const targetAspectRatio = 3 / 4;
     const sourceAspectRatio = sourceWidth / sourceHeight;
+    const zoomFactor = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
 
     if (sourceAspectRatio > targetAspectRatio) {
-        const width = sourceHeight * targetAspectRatio;
+        const width = (sourceHeight * targetAspectRatio) / zoomFactor;
+        const height = sourceHeight / zoomFactor;
         return {
             x: (sourceWidth - width) / 2,
-            y: 0,
+            y: (sourceHeight - height) / 2,
             width,
-            height: sourceHeight,
+            height,
         };
     }
 
-    const height = sourceWidth / targetAspectRatio;
+    const width = sourceWidth / zoomFactor;
+    const height = sourceWidth / targetAspectRatio / zoomFactor;
     return {
-        x: 0,
+        x: (sourceWidth - width) / 2,
         y: (sourceHeight - height) / 2,
-        width: sourceWidth,
+        width,
         height,
     };
 }

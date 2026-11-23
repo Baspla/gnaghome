@@ -28,4 +28,13 @@ describe('getCenteredCropRect', () => {
             height: 960,
         });
     });
+
+    it('applies centered digital zoom to the preview crop', () => {
+        expect(getCenteredCropRect(1280, 960, 2)).toEqual({
+            x: 460,
+            y: 240,
+            width: 360,
+            height: 480,
+        });
+    });
 });
