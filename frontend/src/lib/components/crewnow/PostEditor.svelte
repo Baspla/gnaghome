@@ -4,6 +4,7 @@
     import Button from '$lib/components/Button.svelte';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import PersonTagPicker from './PersonTagPicker.svelte';
+    import { getCenteredCropRect } from './camera-capture';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
 
     type Person = { id: string; name: string; image: string | null };
@@ -18,6 +19,12 @@
     };
     type CameraFacing = 'environment' | 'user';
     type Preferences = { mirrorFrontPreview: boolean; captureDelaySeconds: 1 | 2 | 3 | 5 };
+    type CameraZoomRange = { min: number; max: number; step?: number };
+    type CameraZoomTrack = Omit<MediaStreamTrack, 'getCapabilities' | 'getSettings' | 'applyConstraints'> & {
+        getCapabilities: () => MediaTrackCapabilities & { zoom?: CameraZoomRange };
+        getSettings: () => MediaTrackSettings & { zoom?: number };
+        applyConstraints: (constraints: MediaTrackConstraints & { zoom: number }) => Promise<void>;
+    };
     const defaultPreferences: Preferences = { mirrorFrontPreview: true, captureDelaySeconds: 1 };
 
     let {
@@ -44,6 +51,10 @@
     let taggedUserIds = $state<string[]>([]);
     let cameraStream: MediaStream | null = null;
     let videoElement: HTMLVideoElement | undefined = $state();
+    let cameraZoomTrack: CameraZoomTrack | null = null;
+    let zoomRange = $state<CameraZoomRange | null>(null);
+    let zoom = $state(1);
+    let zoomApplyTimeout: ReturnType<typeof setTimeout> | undefined;
     let createPostId = $state('');
     let firstCaptureFacing = $state<CameraFacing | null>(null);
 
@@ -97,6 +108,10 @@
     function stopCamera() {
         cameraRun++;
         cancelFrameWait?.();
+        clearTimeout(zoomApplyTimeout);
+        zoomApplyTimeout = undefined;
+        cameraZoomTrack = null;
+        zoomRange = null;
         cameraStream?.getTracks().forEach((track) => track.stop());
         cameraStream = null;
         if (videoElement) videoElement.srcObject = null;
@@ -125,12 +140,46 @@
             await videoElement.play();
             await waitForVideoFrame(videoElement);
             if (activeRun !== cameraRun) return;
+            setCameraZoom(cameraStream.getVideoTracks()[0] as CameraZoomTrack | undefined);
         } catch {
             if (activeRun !== cameraRun) return;
             stopCamera();
             errorMessage = 'Die Kamera konnte nicht gestartet werden. Bitte erlaube den Zugriff oder wähle eine andere Kamera.';
             currentStep = 'inactive';
         }
+    }
+
+    function setCameraZoom(track: CameraZoomTrack | undefined) {
+        cameraZoomTrack = null;
+        zoomRange = null;
+        if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') return;
+
+        try {
+            const range = track.getCapabilities().zoom;
+            if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return;
+
+            cameraZoomTrack = track;
+            zoomRange = range;
+            zoom = Math.min(range.max, Math.max(range.min, track.getSettings().zoom ?? range.min));
+        } catch {
+            // Zoom controls are optional; some browsers expose camera streams without track capabilities.
+        }
+    }
+
+    function updateCameraZoom(value: number) {
+        zoom = value;
+        const track = cameraZoomTrack;
+        if (!track || !zoomRange) return;
+
+        clearTimeout(zoomApplyTimeout);
+        zoomApplyTimeout = setTimeout(() => {
+            zoomApplyTimeout = undefined;
+            if (track !== cameraZoomTrack || track.readyState !== 'live') return;
+            void track.applyConstraints({ zoom: value }).catch(() => {
+                // A device can advertise zoom but fail to apply it; do not block camera capture.
+                if (track === cameraZoomTrack) zoomRange = null;
+            });
+        }, 80);
     }
 
     async function getCameraStream(facing: CameraFacing, isCurrentRun: () => boolean): Promise<MediaStream> {
@@ -254,14 +303,25 @@
                 return;
             }
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            const crop = getCenteredCropRect(video.videoWidth, video.videoHeight);
+            canvas.width = Math.round(crop.width);
+            canvas.height = Math.round(crop.height);
             const context = canvas.getContext('2d');
             if (!context) {
                 reject(new Error('Das Foto konnte nicht aufgenommen werden.'));
                 return;
             }
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            context.drawImage(
+                video,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+            );
             canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Das Foto konnte nicht gespeichert werden.')), 'image/jpeg', 0.9);
         });
     }
@@ -543,6 +603,22 @@
                         </div>
                     {/if}
                 </div>
+                {#if zoomRange}
+                    <label class="mx-auto flex w-full max-w-sm items-center gap-3 text-sm text-surface-700-300">
+                        <span>Zoom</span>
+                        <input
+                            type="range"
+                            min={zoomRange.min}
+                            max={zoomRange.max}
+                            step={zoomRange.step ?? 'any'}
+                            value={zoom}
+                            aria-label="Kamerazoom"
+                            class="w-full accent-primary-500"
+                            oninput={(event) => updateCameraZoom(Number(event.currentTarget.value))}
+                        />
+                        <output class="w-12 text-right tabular-nums" aria-live="off">{zoom.toFixed(1)}×</output>
+                    </label>
+                {/if}
                 <div class="flex justify-center gap-3">
                     <Button type="button" variant="outlined" onclick={() => void switchCamera()} disabled={isCapturing || isSwitchingCamera}>{isSwitchingCamera ? 'Kamera wird gewechselt …' : 'Kamera wechseln'}</Button>
                     <Button type="button" onclick={() => void captureBoth()} disabled={isCapturing}>{isCapturing ? 'Aufnahme läuft …' : 'Aufnehmen'}</Button>
