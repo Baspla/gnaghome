@@ -2,23 +2,21 @@
     import { api } from '$lib/api';
     import Button from '$lib/components/Button.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
+    import { mergePeopleById, type PersonProfile } from './person-cache';
 
-    type Person = { id: string; name: string; image: string | null };
+    type Person = PersonProfile;
     type Props = { selectedIds: string[]; initialSelectedUsers?: Person[]; onChange: (ids: string[]) => void };
 
     let { selectedIds, initialSelectedUsers = [], onChange }: Props = $props();
     let people = $state<Person[]>([]);
+    let cachedPeople = $state<Person[]>([]);
     let query = $state('');
     let loading = $state(false);
     let errorMessage = $state<string | null>(null);
     let searchTimer: ReturnType<typeof setTimeout> | undefined;
     let currentQuery = '';
 
-    const availablePeople = $derived.by(() => {
-        const peopleById = new Map(initialSelectedUsers.map((person) => [person.id, person]));
-        for (const person of people) peopleById.set(person.id, person);
-        return [...peopleById.values()];
-    });
+    const availablePeople = $derived(mergePeopleById(initialSelectedUsers, cachedPeople));
 
     async function loadPeople(search: string) {
         loading = true;
@@ -27,7 +25,10 @@
         try {
             const response = await api.crewnow.users.get({ query: { q: search, limit: 20 } });
             if (response.error || !response.data) throw new Error('People request failed');
-            if (currentQuery === search) people = response.data.items as Person[];
+            if (currentQuery === search) {
+                people = response.data.items as Person[];
+                cachedPeople = mergePeopleById(cachedPeople, people);
+            }
         } catch {
             errorMessage = 'Personen konnten nicht geladen werden. Bitte versuche es erneut.';
         } finally {
