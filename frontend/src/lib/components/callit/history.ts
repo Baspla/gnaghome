@@ -3,20 +3,51 @@ import type { CallItHistoryPoint } from './types';
 /** Long flat runs (overnight/weekend/closed markets) are compressed for chart display. */
 export const FLAT_RUN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
 
-/** Returns a point's horizontal chart position as a percentage of the time range. */
-export function historyPointPercent(
-    observedAt: string,
-    firstObservedAt: string,
-    lastObservedAt: string,
-): number {
-    const pointTime = new Date(observedAt).getTime();
-    const firstTime = new Date(firstObservedAt).getTime();
-    const lastTime = new Date(lastObservedAt).getTime();
-    const span = lastTime - firstTime;
-    if (!Number.isFinite(pointTime) || !Number.isFinite(firstTime) || !Number.isFinite(lastTime) || span <= 0) {
-        return 0;
+/**
+ * Returns each point's horizontal chart position as a percentage of the
+ * trading-session timeline. Points separated by more than `sessionGapMs` start
+ * a new session, so nights, weekends and holidays take no horizontal space and
+ * consecutive sessions join at their boundary. Every session gets an equal
+ * width; inside a session, points keep their relative time position.
+ */
+export function historyChartPercents(
+    points: CallItHistoryPoint[],
+    sessionGapMs = FLAT_RUN_THRESHOLD_MS,
+): number[] {
+    if (points.length === 0) return [];
+
+    const ordered = points
+        .map((point, inputIndex) => ({ inputIndex, time: new Date(point.observedAt).getTime() }))
+        .sort((a, b) => a.time - b.time);
+
+    if (ordered.some((entry) => !Number.isFinite(entry.time))) {
+        return points.map((_, index) => (index / Math.max(1, points.length - 1)) * 100);
     }
-    return Math.min(100, Math.max(0, ((pointTime - firstTime) / span) * 100));
+
+    const sessions: Array<Array<{ inputIndex: number; time: number }>> = [];
+    for (const entry of ordered) {
+        const current = sessions[sessions.length - 1];
+        if (!current || entry.time - current[current.length - 1]!.time > sessionGapMs) {
+            sessions.push([entry]);
+        } else {
+            current.push(entry);
+        }
+    }
+
+    const percents = new Array<number>(points.length).fill(0);
+    sessions.forEach((session, sessionIndex) => {
+        const first = session[0]!;
+        const last = session[session.length - 1]!;
+        const span = last.time - first.time;
+        for (const entry of session) {
+            // Single-point sessions sit in the middle of their slot so a daily
+            // series does not end up flush against the chart edges.
+            const fraction = span > 0 ? (entry.time - first.time) / span : 0.5;
+            percents[entry.inputIndex] = ((sessionIndex + fraction) / sessions.length) * 100;
+        }
+    });
+
+    return percents;
 }
 
 export function compactFlatHistory(

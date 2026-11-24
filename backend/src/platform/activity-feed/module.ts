@@ -111,10 +111,18 @@ export function createActivityFeedModule(
                             const subjectResult = activity.subjectUserId
                                 ? await userService.getUserAsUser(user.id, activity.subjectUserId)
                                 : null;
+                            const commentCount = activity.discussionId && discussionsService
+                                ? (await discussionsService.getMessageCounts([activity.discussionId]))[activity.discussionId] ?? 0
+                                : 0;
+                            const reactionCount = reactionsService
+                                ? (await reactionsService.getCounts('callit.prediction', [activity.targetId]))[activity.targetId] ?? 0
+                                : 0;
                             items.push(toActivitySummary(
                                 activity,
                                 actorResult?.ok ? toPublicUser(actorResult.value) : null,
                                 subjectResult?.ok ? toPublicUser(subjectResult.value) : null,
+                                commentCount,
+                                reactionCount,
                             ));
                         }
                         continue;

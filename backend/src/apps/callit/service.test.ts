@@ -266,6 +266,7 @@ describe('CallItService', () => {
             type: 'callit.prediction.created',
             actorUserId: 'user-1',
             target: { type: 'callit.prediction', id: 'prediction-created' },
+            discussionId: tracker.discussionId,
             data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'UP' },
         }));
         expect(notifyAll).toHaveBeenCalledWith('callit.prediction.new', ['user-1'], expect.objectContaining({
@@ -297,12 +298,14 @@ describe('CallItService', () => {
             type: 'callit.prediction.completed',
             subjectUserId: 'user-1',
             target: { type: 'callit.prediction', id: 'prediction-up' },
+            discussionId: tracker.discussionId,
             data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'UP', successful: true },
         }));
         expect(activityInputs).toContainEqual(expect.objectContaining({
             type: 'callit.prediction.completed',
             subjectUserId: 'user-2',
             target: { type: 'callit.prediction', id: 'prediction-down' },
+            discussionId: tracker.discussionId,
             data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'DOWN', successful: false },
         }));
 

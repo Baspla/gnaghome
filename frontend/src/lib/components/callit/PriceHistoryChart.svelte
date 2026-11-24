@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { CallItHistoryPoint } from './types';
     import { formatDate, formatTrackerPrice } from './format';
-    import { compactFlatHistory, historyPointPercent } from './history';
+    import { compactFlatHistory, historyChartPercents } from './history';
 
     type Props = {
         points: CallItHistoryPoint[];
@@ -25,15 +25,16 @@
     const paddedMin = $derived(minPrice - (range - (maxPrice - minPrice)) / 2);
     const firstPoint = $derived(sampled[0] ?? null);
     const lastPoint = $derived(sampled[sampled.length - 1] ?? null);
-    // Long ranges mix daily history with recent intraday points, so X must be
-    // based on timestamps rather than point index.
+    // Closed markets take no horizontal space: every trading session gets an
+    // equal slot and consecutive sessions join at their boundary.
+    const chartXPercent = $derived(historyChartPercents(sampled));
     const chartPath = $derived.by(() => {
         if (sampled.length < 2 || !firstPoint || !lastPoint) return '';
         const width = 1000;
         const chartHeight = 300;
         const padding = 12;
         return sampled.map((point, index) => {
-            const xPercent = historyPointPercent(point.observedAt, firstPoint.observedAt, lastPoint.observedAt);
+            const xPercent = chartXPercent[index] ?? 0;
             const x = padding + (xPercent / 100) * (width - padding * 2);
             const y = chartHeight - padding - ((point.price - paddedMin) / range) * (chartHeight - padding * 2);
             return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;

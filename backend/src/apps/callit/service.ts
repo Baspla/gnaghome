@@ -999,6 +999,7 @@ export class CallItService {
                 type: 'callit.prediction.created',
                 actorUserId: userId,
                 target: { type: 'callit.prediction', id: predictionId },
+                discussionId: tracker.discussionId,
                 data: {
                     trackerId: tracker.id,
                     trackerSymbol: tracker.symbol,
@@ -1385,6 +1386,7 @@ export class CallItService {
                     type: 'callit.prediction.completed',
                     subjectUserId: prediction.userId,
                     target: { type: 'callit.prediction', id: prediction.id },
+                    discussionId: tracker.discussionId,
                     data: {
                         trackerId: tracker.id,
                         trackerSymbol: tracker.symbol,

@@ -114,14 +114,16 @@
         });
         const unsubscribeReaction = gateway.onEvent('reaction.changed', (event) => {
             const separator = event.entityId.indexOf(':');
-            if (separator < 0 || event.entityId.slice(0, separator) !== 'crewnow.post') return;
-            let postId: string;
+            if (separator < 0) return;
+            const targetType = event.entityId.slice(0, separator);
+            if (targetType !== 'crewnow.post' && targetType !== 'callit.prediction') return;
+            let targetId: string;
             try {
-                postId = decodeURIComponent(event.entityId.slice(separator + 1));
+                targetId = decodeURIComponent(event.entityId.slice(separator + 1));
             } catch {
                 return;
             }
-            if (activities.some((activity) => activity.target?.type === 'crewnow.post' && activity.target.id === postId)) {
+            if (activities.some((activity) => activity.target?.type === targetType && activity.target.id === targetId)) {
                 void loadActivities(false);
             }
         });
@@ -270,8 +272,8 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm text-surface-600-400 transition-colors hover:bg-surface-200-800 hover:text-primary-700-300 sm:px-3"
                                     aria-label={activityLinkLabel(activity)}
                                 >
-                                    {#if activity.target?.type === 'crewnow.post'}
-                                        <Heart class="ml-2 h-4 w-4" aria-hidden="true" />
+                                    {#if activity.target?.type === 'crewnow.post' || activity.target?.type === 'callit.prediction'}
+                                        <Heart class="h-4 w-4" aria-hidden="true" />
                                         <span>{activity.reactionCount}</span>
                                     {/if}
                                     {#if activity.discussionId}

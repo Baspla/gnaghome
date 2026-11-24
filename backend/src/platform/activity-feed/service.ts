@@ -86,12 +86,14 @@ export type RecordActivityInput =
         actorUserId: string;
         subjectUserId?: string | null;
         target: ActivityTarget & { type: 'callit.prediction' };
+        discussionId?: string | null;
         data: ActivityDataByType['callit.prediction.created'];
     })
     | (ActivityInputBase<'callit.prediction.completed'> & {
         actorUserId?: null;
         subjectUserId: string;
         target: ActivityTarget & { type: 'callit.prediction' };
+        discussionId?: string | null;
         data: ActivityDataByType['callit.prediction.completed'];
     });
 
@@ -309,7 +311,7 @@ export class ActivityFeedService {
             || (input.type === 'crewnow.image_posted' && (
                 typeof input.discussionId !== 'string' || input.discussionId.trim().length === 0
             ))
-            || ('discussionId' in input && input.discussionId !== undefined && (
+            || ('discussionId' in input && input.discussionId !== undefined && input.discussionId !== null && (
                 typeof input.discussionId !== 'string' || input.discussionId.trim().length === 0
             ))
             || (input.occurredAt !== undefined && !isValidDate(input.occurredAt))) {
@@ -317,6 +319,9 @@ export class ActivityFeedService {
         }
 
         const occurredAt = input.occurredAt ?? new Date();
+        const discussionId = 'discussionId' in input && typeof input.discussionId === 'string'
+            ? input.discussionId
+            : null;
         try {
             if (input.type === 'crewnow.image_posted' && input.target?.type === 'crewnow.post') {
                 const [existing] = await this.db.select().from(activityFeedItem)
@@ -334,7 +339,7 @@ export class ActivityFeedService {
                 subjectUserId: input.subjectUserId ?? null,
                 targetType: input.target?.type ?? null,
                 targetId: input.target?.id ?? null,
-                discussionId: input.type === 'crewnow.image_posted' ? input.discussionId : null,
+                discussionId,
                 data: JSON.stringify(input.data),
                 occurredAt,
             }).returning().get();

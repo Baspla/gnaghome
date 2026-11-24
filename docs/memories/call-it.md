@@ -38,7 +38,7 @@ Wagers are virtual points displayed as euro (`€`). They do not touch a wallet 
 - Tracker validation and the 30-day backfill use `chart(symbol, { interval: '15m' })`; the long-range backfill uses `chart(symbol, { interval: '1d' })`.
 - Each tracker has persisted price history in `callit_price_snapshot` with a `(tracker_id, observed_at)` primary key and `source` of `sync`, `backfill`, `quote`, or `history`.
 - Scheduled snapshots are only appended while Yahoo reports `REGULAR` market state (or when the state is unknown). Closed, pre-market, and post-market syncs still update the tracker's current price and resolve due predictions, but do not append flat history points.
-- The chart additionally compacts long flat runs (more than two hours) for existing data, so a closed-market stretch is drawn as a direct move from the last close to the next session's first move.
+- The chart additionally compacts long flat runs (more than two hours) and collapses non-trading time: points separated by more than two hours form separate trading sessions, every session gets an equal-width slot, and consecutive sessions join at their boundary, so nights, weekends, and holidays take no horizontal space. Points keep their relative time position inside a session. This keeps long ranges that mix daily and 15-minute points proportionally correct.
 - New trackers backfill the last 30 days of 15-minute closes and five years of daily closes on creation. The five-year daily series covers both the 1-year and 5-year views. Reactivating a tracker refreshes the five-year series so long removal gaps are filled. Backfill failure does not fail tracker creation; the scheduled sync fills future points, and long-range views retry the long backfill lazily.
 - Tracker pages read persisted history. If a range longer than 30 days is requested and the tracker has no `history`-source rows yet, the service fetches five years of daily closes once and persists them before returning; later reads use the cache. This also backfills trackers created before the long-range cache existed.
 - History is currently retained indefinitely. At 15-minute intervals this is about 35k rows per tracker per year; five years of daily closes add roughly 1.3k rows per tracker, acceptable for the SQLite deployment.
@@ -58,12 +58,14 @@ Wagers are virtual points displayed as euro (`€`). They do not touch a wallet 
   - Reactions target type: `callit.prediction`.
   - Discussions/comments target type: `callit.tracker`.
   - Tracker rows store their canonical `discussion_id`.
-  - Activity types: `callit.prediction.created` and `callit.prediction.completed`, both targeting `callit.prediction`.
+  - Activity types: `callit.prediction.created` and `callit.prediction.completed`, both targeting `callit.prediction` and referencing the owning tracker's canonical `discussion_id`.
   - Notification topics: `callit.prediction.new`, `callit.prediction.completed`, and `callit.prediction.mine-completed`.
 
 ## Activity and notifications
 
 Every newly placed prediction records one `callit.prediction.created` activity after the prediction is durably stored. The actor is the player, and the payload contains the tracker ID, tracker symbol, and direction. Predictions are visible to all authenticated users, so the feed authorizes the `callit.prediction` target through `CallItService.canViewPrediction`.
+
+Both Call it activity types also store the owning tracker's canonical `discussion_id` (when the tracker has one). Feed reads therefore resolve two independent counts per Call it item: the comment count of the tracker discussion and the reaction count of the prediction's `callit.prediction` reaction target. This mirrors the app pages, where the tracker page shows the discussion and each prediction card shows its reactions. The feed refetches visible Call it items when a matching `reaction.changed` event arrives and when discussion messages change (the discussions platform publishes an `activity-feed.changed` collection event); reconnect recovery refetches the persisted feed.
 
 When a scheduled sync resolves a prediction, it records one `callit.prediction.completed` activity with the player as subject and the tracker symbol, direction, and a `successful` flag (`profitLoss > 0`) in the payload. Completion activities and their notifications are best-effort: a failure is logged and does not abort the durable resolution or the rest of the sync.
 
@@ -107,6 +109,7 @@ Frontend pages match the relevant ID, refetch persisted state, and also refetch 
 - Profile page: `CallItStatsCard` shows active wager count/total, all-time profit, and a link to the per-user page.
 - Admin settings: `CallItAdminSettings` in the user settings dialog, visible only for admins. Adding a tracker requires a successful preview for the current symbol (quote, market state, 30-day chart, and existing-tracker status), and each tracker row offers a soft "Entfernen" plus a destructive "Vollständig entfernen" action.
 - Shared reaction UI: `frontend/src/lib/components/Reactions.svelte`, used by both CrewNow and predictions.
+- Dashboard activity feed: CrewNow and Call it items show the canonical comment count of their discussion and the reaction count of their target; Call it items show the tracker discussion count and the prediction reaction count.
 
 ## Deliberately out of scope in the first version
 

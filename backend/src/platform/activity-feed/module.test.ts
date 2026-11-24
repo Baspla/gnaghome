@@ -198,6 +198,38 @@ describe('activity feed HTTP module', () => {
         expect(await hidden.json()).toMatchObject({ items: [], nextCursor: null });
     });
 
+    it('resolves the tracker discussion comments and prediction reactions for Call it activities', async () => {
+        const trackerDiscussion = await discussions.getOrCreateDiscussion('callit.tracker', 'tracker-1');
+        if (!trackerDiscussion.ok) throw new Error('discussion setup failed');
+        await discussions.createMessage(trackerDiscussion.value.id, 'actor-1', 'Kommentar eins');
+        await discussions.createMessage(trackerDiscussion.value.id, 'subject-1', 'Kommentar zwei');
+        await reactions.toggleReaction('callit.prediction', 'prediction-1', 'subject-1', '🔥');
+        await reactions.toggleReaction('callit.prediction', 'prediction-1', 'viewer-1', '❤️');
+
+        await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'actor-1',
+            target: { type: 'callit.prediction', id: 'prediction-1' },
+            discussionId: trackerDiscussion.value.id,
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+            occurredAt: new Date('2026-10-28T12:00:00.000Z'),
+        });
+
+        const response = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body).toMatchObject({
+            items: [{
+                type: 'callit.prediction.created',
+                target: { type: 'callit.prediction', id: 'prediction-1' },
+                discussionId: trackerDiscussion.value.id,
+                commentCount: 2,
+                reactionCount: 2,
+            }],
+        });
+    });
+
     it('resolves current post tags on every activity feed read and omits deleted posts', async () => {
         await service.recordActivity({
             type: 'crewnow.image_posted',

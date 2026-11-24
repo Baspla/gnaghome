@@ -93,6 +93,43 @@ describe('ActivityFeedService', () => {
         } as never)).toMatchObject({ ok: false, error: { status: 400 } });
     });
 
+    it('stores the owning tracker discussion reference on Call it prediction activity', async () => {
+        const trackerDiscussion = await discussions.getOrCreateDiscussion('callit.tracker', 'tracker-1');
+        if (!trackerDiscussion.ok) throw new Error('discussion setup failed');
+
+        const created = await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-discussion' },
+            discussionId: trackerDiscussion.value.id,
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+        });
+        const completed = await service.recordActivity({
+            type: 'callit.prediction.completed',
+            subjectUserId: 'user-2',
+            target: { type: 'callit.prediction', id: 'prediction-discussion' },
+            discussionId: trackerDiscussion.value.id,
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP', successful: true },
+        });
+
+        expect(created).toMatchObject({ ok: true, value: { discussionId: trackerDiscussion.value.id } });
+        expect(completed).toMatchObject({ ok: true, value: { discussionId: trackerDiscussion.value.id } });
+        const withoutReference = await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-without-discussion' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+        });
+        expect(withoutReference).toMatchObject({ ok: true, value: { discussionId: null } });
+        expect(await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-blank-discussion' },
+            discussionId: '   ',
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+        })).toMatchObject({ ok: false, error: { status: 400 } });
+    });
+
     it('publishes a thin public feed-change event after an activity is durably recorded', async () => {
         const result = await service.recordActivity({
             type: 'profile.updated',
