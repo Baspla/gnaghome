@@ -1,6 +1,6 @@
 {
   "name": "gnaghome",
-  "version": "1.0.51",
+  "version": "1.2.0",
   "private": true,
   "workspaces": [
     "backend",

@@ -12,12 +12,14 @@
     import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
     import Users from "@lucide/svelte/icons/users";
     import Smile from "@lucide/svelte/icons/smile";
+    import TrendingUp from "@lucide/svelte/icons/trending-up";
     import { api } from "$lib/api";
     import Button from '$lib/components/Button.svelte';
     import EmojiPicker from '$lib/components/EmojiPicker.svelte';
     import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
     import CrewNowPreferences from "./CrewNowPreferences.svelte";
+    import CallItAdminSettings from "$lib/components/callit/CallItAdminSettings.svelte";
     import { getCustomEmojis, refreshCustomEmojis } from "$lib/custom-emoji-catalog.svelte";
 
     const user = $derived(page.data.user ?? null);
@@ -29,7 +31,7 @@
         { id: "preferences", label: "Präferenzen", icon: SlidersHorizontal },
     ];
     type AdminUser = { id: string; name: string; email: string; image: string | null };
-    type AdminSection = "users" | "custom-emojis";
+    type AdminSection = "users" | "custom-emojis" | "callit";
     let activeSection = $state<SettingsSection | AdminSection>("profile");
     let adminUsers = $state<AdminUser[]>([]);
     let adminUsersLoading = $state(false);
@@ -237,6 +239,19 @@
                     <Smile class="h-4 w-4" />
                     Custom Emoji
                 </Button>
+                <Button
+                    variant="unstyled"
+                    type="button"
+                    aria-pressed={activeSection === "callit"}
+                    class="flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors
+                        {activeSection === "callit"
+                            ? 'bg-primary-500 text-primary-contrast-500'
+                            : 'hover:bg-surface-100 hover:text-surface-contrast-100'}"
+                    onclick={() => selectSection("callit")}
+                >
+                    <TrendingUp class="h-4 w-4" />
+                    Call it
+                </Button>
             </div>
         {/if}
     </nav>
@@ -346,6 +361,8 @@
             <NotificationSettings />
         {:else if activeSection === "preferences"}
             <CrewNowPreferences />
+        {:else if activeSection === "callit"}
+            <CallItAdminSettings />
         {:else if activeSection === "custom-emojis"}
             <section aria-labelledby="admin-custom-emojis-heading" class="flex flex-col gap-4">
                 <div>

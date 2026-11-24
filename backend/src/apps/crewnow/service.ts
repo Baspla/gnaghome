@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray, like, lt, ne, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, lt, ne, or, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import {
     err,
@@ -17,7 +17,7 @@ import { user } from '../../platform/users/schema';
 import { crewNowPost, crewNowPostTag, type CrewNowPost } from './schema';
 import type { DiscussionsService } from '../../platform/discussions/service';
 import type { BroadcastPublisher } from '../../platform/realtime/service';
-import type { CrewNowPostChangedEvent, CrewNowTimelineChangedEvent } from '$shared/dto/platform-event';
+import type { CrewNowPostChangedEvent, CrewNowTimelineChangedEvent, CrewNowUserStatsChangedEvent } from '$shared/dto/platform-event';
 import { RealtimeChannels } from '$shared/constants';
 import type { NotificationsService } from '../../platform/notifications/service';
 import type { ReactionsService } from '../../platform/reactions/service';
@@ -42,6 +42,13 @@ export type CrewNowPostSummary = {
 
 export type CrewNowCursor = { createdAt: Date; id: string };
 export type CrewNowTimeline = { items: CrewNowPostSummary[]; nextCursor: CrewNowCursor | null };
+
+export type CrewNowStats = {
+    postCount: number;
+    taggedCount: number;
+    reactionCount: number;
+    commentCount: number;
+};
 
 type CreatePostInput = {
     id: string;
@@ -162,6 +169,38 @@ export class CrewNowService {
         }
     }
 
+    async getUserStats(targetUserId: string): Promise<Result<CrewNowStats, CrewNowError>> {
+        if (!validId(targetUserId)) {
+            return err({ status: 400, code: 'BAD_REQUEST', message: 'Ungültige Benutzer-ID.' });
+        }
+        try {
+            const [targetUser] = await this.db.select({ id: user.id })
+                .from(user).where(eq(user.id, targetUserId)).limit(1);
+            if (!targetUser) return err({ status: 404, code: 'NOT_FOUND', message: 'Benutzer nicht gefunden.' });
+
+            const posts = await this.db.select({
+                id: crewNowPost.id,
+                discussionId: crewNowPost.discussionId,
+            }).from(crewNowPost).where(eq(crewNowPost.authorUserId, targetUserId));
+            const [tagged] = await this.db.select({ count: sql<number>`count(*)` })
+                .from(crewNowPostTag).where(eq(crewNowPostTag.taggedUserId, targetUserId));
+
+            const postIds = posts.map((post) => post.id);
+            const discussionIds = posts.flatMap((post) => post.discussionId ? [post.discussionId] : []);
+            const reactionCounts = this.reactions ? await this.reactions.getCounts('crewnow.post', postIds) : {};
+            const commentCounts = await this.discussions.getMessageCounts(discussionIds);
+
+            return ok({
+                postCount: posts.length,
+                taggedCount: Number(tagged?.count ?? 0),
+                reactionCount: Object.values(reactionCounts).reduce((total, count) => total + Number(count), 0),
+                commentCount: Object.values(commentCounts).reduce((total, count) => total + Number(count), 0),
+            });
+        } catch {
+            return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Die CrewNow-Statistik konnte nicht geladen werden.' });
+        }
+    }
+
     async createPost(authorUserId: string, input: CreatePostInput): Promise<Result<CrewNowPostSummary & { created: boolean }, CrewNowError>> {
         if (!validId(input.id)
             || !validId(input.backImageFileId)
@@ -276,6 +315,7 @@ export class CrewNowService {
             if (!recorded.ok) return err(recorded.error);
             await this.publishPostChanged(post.id, 'CREATED');
             await this.publishTimelineChanged('CREATED');
+            await this.publishUserStatsChangedFor([authorUserId, ...input.taggedUserIds]);
             await this.notifications.notifyAll('crewnow.post.new', [authorUserId, ...input.taggedUserIds], {
                 title: 'Neuer CrewNow',
                 body: 'Ein neuer CrewNow wurde geteilt.',
@@ -308,6 +348,7 @@ export class CrewNowService {
             if (!(await this.validateTaggedUsers(input.taggedUserIds, authorUserId))) {
                 return err({ status: 400, code: 'BAD_REQUEST', message: 'Mindestens eine markierte Person wurde nicht gefunden.' });
             }
+            const previousTaggedUserIds = (await this.getTaggedUsers(postId)).map((taggedUser) => taggedUser.id);
 
             await this.db.transaction(async (tx) => {
                 await tx.update(crewNowPost).set({ caption: input.caption, updatedAt: new Date() })
@@ -326,6 +367,7 @@ export class CrewNowService {
             if (!updated) return err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
             const summary = await this.resolvePost(updated, authorUserId);
             await this.publishPostChanged(postId, 'UPDATED');
+            await this.publishUserStatsChangedFor([...previousTaggedUserIds, ...input.taggedUserIds]);
             return summary ? ok(summary) : err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
         } catch (error) {
             console.error('CrewNow update failed', error);
@@ -339,6 +381,7 @@ export class CrewNowService {
             const [post] = await this.db.select().from(crewNowPost).where(eq(crewNowPost.id, postId)).limit(1);
             if (!post) return err({ status: 404, code: 'NOT_FOUND', message: 'Post nicht gefunden.' });
             if (post.authorUserId !== authorUserId) return err({ status: 403, code: 'FORBIDDEN', message: 'Du kannst nur eigene Posts löschen.' });
+            const taggedUserIds = (await this.getTaggedUsers(postId)).map((taggedUser) => taggedUser.id);
 
             await this.db.transaction(async (tx) => {
                 await tx.delete(crewNowPost).where(eq(crewNowPost.id, postId));
@@ -350,11 +393,39 @@ export class CrewNowService {
             await Promise.all([post.backImageFileId, post.frontImageFileId].map((fileId) => this.files.deleteFile(fileId)));
             await this.activityFeed.invalidateFeed('DELETED');
             await this.publishPostChanged(postId, 'DELETED');
+            await this.publishUserStatsChangedFor([post.authorUserId, ...taggedUserIds]);
             return ok(null);
         } catch (error) {
             console.error('CrewNow delete failed', error);
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Post konnte nicht gelöscht werden.' });
         }
+    }
+
+    private async publishUserStatsChangedFor(userIds: Iterable<string>): Promise<void> {
+        await Promise.all([...new Set(userIds)].map((userId) => this.publishUserStatsChanged(userId)));
+    }
+
+    private async publishUserStatsChanged(userId: string): Promise<void> {
+        const event: CrewNowUserStatsChangedEvent = {
+            id: randomUUID(),
+            occurredAt: new Date().toISOString(),
+            type: 'crewnow.user-stats.changed',
+            action: 'UPDATED',
+            entityId: userId,
+        };
+        try {
+            const result = await this.broadcast([RealtimeChannels.PUBLIC], event);
+            if (!result.ok) console.warn('CrewNow user stats broadcast failed', result.error.message);
+        } catch {
+            // Stats are derived from persisted data; clients recover through the API.
+        }
+    }
+
+    /** Notify profile stat viewers after a reaction or comment changes on a post. */
+    async notifyStatsChangedForPost(postId: string): Promise<void> {
+        if (!validId(postId)) return;
+        const ownerUserId = await this.getPostOwnerUserId(postId);
+        if (ownerUserId) await this.publishUserStatsChanged(ownerUserId);
     }
 
     private async publishPostChanged(postId: string, action: CrewNowPostChangedEvent['action']): Promise<void> {

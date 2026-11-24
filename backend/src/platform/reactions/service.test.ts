@@ -96,6 +96,20 @@ describe('ReactionsService', () => {
         expect(onCreated).toHaveBeenCalledWith({ targetType: 'crewnow.post', targetId: 'post-1' }, 'user-1');
     });
 
+    it('calls the change hook for created, replaced, and removed reactions', async () => {
+        const onChanged = mock(async () => {});
+        service = new ReactionsService(database.db, broadcast, undefined, async () => false, undefined, onChanged);
+
+        await service.toggleReaction('crewnow.post', 'post-1', 'user-1', '❤️');
+        await service.toggleReaction('crewnow.post', 'post-1', 'user-1', '🔥');
+        await service.toggleReaction('crewnow.post', 'post-1', 'user-1', '🔥');
+
+        expect(onChanged).toHaveBeenCalledTimes(3);
+        expect(onChanged).toHaveBeenNthCalledWith(1, { targetType: 'crewnow.post', targetId: 'post-1' }, 'CREATED');
+        expect(onChanged).toHaveBeenNthCalledWith(2, { targetType: 'crewnow.post', targetId: 'post-1' }, 'UPDATED');
+        expect(onChanged).toHaveBeenNthCalledWith(3, { targetType: 'crewnow.post', targetId: 'post-1' }, 'DELETED');
+    });
+
     it('validates namespaced targets and removes all reactions for a deleted target', async () => {
         expect(await service.toggleReaction('bad target', 'post-1', 'user-1', '❤️'))
             .toMatchObject({ ok: false, error: { status: 400 } });

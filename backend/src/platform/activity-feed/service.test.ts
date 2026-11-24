@@ -52,6 +52,47 @@ describe('ActivityFeedService', () => {
         expect(result.value.createdAt).toBeInstanceOf(Date);
     });
 
+    it('accepts Call it prediction creation and completion activity payloads', async () => {
+        const created = await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-1' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+        });
+        const completed = await service.recordActivity({
+            type: 'callit.prediction.completed',
+            subjectUserId: 'user-2',
+            target: { type: 'callit.prediction', id: 'prediction-2' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'DOWN', successful: false },
+        });
+
+        expect(created).toMatchObject({
+            ok: true,
+            value: {
+                type: 'callit.prediction.created',
+                actorUserId: 'user-1',
+                targetType: 'callit.prediction',
+                targetId: 'prediction-1',
+                data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+            },
+        });
+        expect(completed).toMatchObject({
+            ok: true,
+            value: {
+                type: 'callit.prediction.completed',
+                subjectUserId: 'user-2',
+                targetType: 'callit.prediction',
+                data: { direction: 'DOWN', successful: false },
+            },
+        });
+        expect(await service.recordActivity({
+            type: 'callit.prediction.completed',
+            subjectUserId: 'user-2',
+            target: { type: 'callit.prediction', id: 'prediction-3' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'DOWN' },
+        } as never)).toMatchObject({ ok: false, error: { status: 400 } });
+    });
+
     it('publishes a thin public feed-change event after an activity is durably recorded', async () => {
         const result = await service.recordActivity({
             type: 'profile.updated',

@@ -298,6 +298,67 @@ describe('CrewNowService', () => {
         if (discussionId) expect(await discussions.getDiscussion(discussionId)).toMatchObject({ ok: false, error: { status: 404 } });
     });
 
+    it('summarizes authored posts, photo tags, reactions, and comments for a profile', async () => {
+        const first = await service.createPost('user-1', {
+            id: 'post-stats-1',
+            backImageFileId: await uploadImage(),
+            frontImageFileId: await uploadImage(),
+            caption: null,
+            taggedUserIds: ['user-2'],
+        });
+        const second = await service.createPost('user-2', {
+            id: 'post-stats-2',
+            backImageFileId: await uploadImage('user-2'),
+            frontImageFileId: await uploadImage('user-2'),
+            caption: null,
+            taggedUserIds: ['user-1', 'user-3'],
+        });
+        expect(first.ok).toBe(true);
+        expect(second.ok).toBe(true);
+        if (!first.ok) throw new Error('post setup failed');
+
+        await reactions.toggleReaction('crewnow.post', 'post-stats-1', 'user-3', '❤️');
+        await reactions.toggleReaction('crewnow.post', 'post-stats-1', 'user-4', '🔥');
+        await discussions.createMessage(first.value.discussionId!, 'user-3', 'Schön!');
+
+        expect(await service.getUserStats('user-1')).toEqual({
+            ok: true,
+            value: { postCount: 1, taggedCount: 1, reactionCount: 2, commentCount: 1 },
+        });
+        expect(await service.getUserStats('user-3')).toEqual({
+            ok: true,
+            value: { postCount: 0, taggedCount: 1, reactionCount: 0, commentCount: 0 },
+        });
+        expect(await service.getUserStats('does-not-exist')).toMatchObject({ ok: false, error: { status: 404 } });
+    });
+
+    it('publishes user stats changes for the author and tagged users when a post changes', async () => {
+        const statsEntities = () => broadcast.mock.calls
+            .map((call) => call[1] as { type: string; entityId: string })
+            .filter((event) => event.type === 'crewnow.user-stats.changed')
+            .map((event) => event.entityId);
+
+        expect(await service.createPost('user-1', {
+            id: 'post-stats-events',
+            backImageFileId: await uploadImage(),
+            frontImageFileId: await uploadImage(),
+            caption: null,
+            taggedUserIds: ['user-2'],
+        })).toMatchObject({ ok: true });
+        expect(statsEntities()).toEqual(expect.arrayContaining(['user-1', 'user-2']));
+
+        broadcast.mockClear();
+        expect(await service.updatePost('user-1', 'post-stats-events', {
+            caption: 'Neu',
+            taggedUserIds: ['user-3'],
+        })).toMatchObject({ ok: true });
+        expect(statsEntities()).toEqual(expect.arrayContaining(['user-2', 'user-3']));
+
+        broadcast.mockClear();
+        expect(await service.deletePost('user-1', 'post-stats-events')).toEqual({ ok: true, value: null });
+        expect(statsEntities()).toEqual(expect.arrayContaining(['user-1', 'user-3']));
+    });
+
     it('discards only the authenticated user’s unreferenced pending upload', async () => {
         const pending = await uploadImage();
         const otherUserUpload = await uploadImage('user-2');

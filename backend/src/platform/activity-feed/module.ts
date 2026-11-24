@@ -4,6 +4,7 @@ import type { UserService } from '../users/service';
 import type { createAuthMiddleware } from '../auth';
 import type { ActivityFeedService, ActivityFeedRecord } from './service';
 import type { CrewNowService } from '../../apps/crewnow/service';
+import type { CallItService } from '../../apps/callit/service';
 import type { DiscussionsService } from '../discussions/service';
 import type { ReactionsService } from '../reactions/service';
 
@@ -12,6 +13,7 @@ type ActivityFeedServiceDependency = Pick<ActivityFeedService, 'getFeed'>;
 type ActivityFeedCrewNowService = Pick<CrewNowService, 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 type ActivityFeedDiscussionsService = Pick<DiscussionsService, 'getMessageCounts'>;
 type ActivityFeedReactionsService = Pick<ReactionsService, 'getCounts'>;
+type ActivityFeedCallItService = Pick<CallItService, 'canViewPrediction'>;
 
 function toPublicUser(user: { id: string; name: string; image: string | null } | null) {
     return user ? { id: user.id, name: user.name, image: user.image } : null;
@@ -47,6 +49,7 @@ export function createActivityFeedModule(
     crewNowService?: ActivityFeedCrewNowService,
     discussionsService?: ActivityFeedDiscussionsService,
     reactionsService?: ActivityFeedReactionsService,
+    callItService?: ActivityFeedCallItService,
 ) {
     return new Elysia({ prefix: '/activity-feed', name: Modules.ACTIVITY_FEED })
         .use(authMiddleware)
@@ -75,9 +78,14 @@ export function createActivityFeedModule(
                             ? activity.subjectUserId
                             : null;
                     if (!profileId) {
-                        if (activity.targetType !== 'crewnow.post' || !activity.targetId || !crewNowService) return false;
-                        const post = await crewNowService.getPostForActivity(viewerId, activity.targetId);
-                        return post.ok;
+                        if (activity.targetType === 'crewnow.post' && activity.targetId && crewNowService) {
+                            const post = await crewNowService.getPostForActivity(viewerId, activity.targetId);
+                            return post.ok;
+                        }
+                        if (activity.targetType === 'callit.prediction' && activity.targetId && callItService) {
+                            return callItService.canViewPrediction(viewerId, activity.targetId);
+                        }
+                        return false;
                     }
 
                     const profile = await userService.getUserAsUser(viewerId, profileId);
@@ -94,7 +102,23 @@ export function createActivityFeedModule(
                         ? activity.subjectUserId
                         : null;
                 if (!profileId) {
-                    if (activity.targetType !== 'crewnow.post' || !activity.targetId || !crewNowService) continue;
+                    if (activity.targetType !== 'crewnow.post' || !activity.targetId || !crewNowService) {
+                        if (activity.targetType === 'callit.prediction' && activity.targetId && callItService
+                            && await callItService.canViewPrediction(user.id, activity.targetId)) {
+                            const actorResult = activity.actorUserId
+                                ? await userService.getUserAsUser(user.id, activity.actorUserId)
+                                : null;
+                            const subjectResult = activity.subjectUserId
+                                ? await userService.getUserAsUser(user.id, activity.subjectUserId)
+                                : null;
+                            items.push(toActivitySummary(
+                                activity,
+                                actorResult?.ok ? toPublicUser(actorResult.value) : null,
+                                subjectResult?.ok ? toPublicUser(subjectResult.value) : null,
+                            ));
+                        }
+                        continue;
+                    }
                     const postResult = await crewNowService.getPostForActivity(user.id, activity.targetId);
                     if (!postResult.ok) continue;
                     const actorResult = activity.actorUserId

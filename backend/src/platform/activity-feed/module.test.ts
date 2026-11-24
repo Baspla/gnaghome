@@ -9,6 +9,7 @@ import type { UserService } from '../users/service';
 import { ActivityFeedService } from './service';
 import { createActivityFeedModule } from './module';
 import type { CrewNowService } from '../../apps/crewnow/service';
+import type { CallItService } from '../../apps/callit/service';
 import { DiscussionsService } from '../discussions/service';
 import { ReactionsService } from '../reactions/service';
 
@@ -19,6 +20,7 @@ describe('activity feed HTTP module', () => {
     let canViewUser: (viewerId: string, targetUserId: string) => boolean;
     let currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
     let postExists = true;
+    let predictionExists = true;
     let discussions: DiscussionsService;
     let reactions: ReactionsService;
     let discussionId = '';
@@ -46,7 +48,10 @@ describe('activity feed HTTP module', () => {
         };
         return new Elysia().use(createActivityFeedModule(auth, service, { getUserAsUser }, crewNowService, {
             getMessageCounts: (ids) => discussions.getMessageCounts(ids),
-        }, reactions));
+        }, reactions, {
+            canViewPrediction: async (_viewerId, predictionId) =>
+                predictionId === 'prediction-1' && predictionExists,
+        } satisfies Pick<CallItService, 'canViewPrediction'>));
     }
 
     beforeEach(async () => {
@@ -79,6 +84,7 @@ describe('activity feed HTTP module', () => {
         canViewUser = (_viewerId, targetUserId) => targetUserId !== 'private-1';
         currentPostTags = [{ id: 'tag-1', name: 'Tag One', image: null }];
         postExists = true;
+        predictionExists = true;
     });
 
     afterEach(() => database.close());
@@ -145,6 +151,51 @@ describe('activity feed HTTP module', () => {
         expect(JSON.stringify(body)).not.toContain('private-1');
         expect(JSON.stringify(body)).toContain('crewnow.post');
         expect(JSON.stringify(body)).not.toContain('alice@example.test');
+    });
+
+    it('returns authorized Call it prediction activities with actor, subject, and result data', async () => {
+        await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'actor-1',
+            target: { type: 'callit.prediction', id: 'prediction-1' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+            occurredAt: new Date('2026-10-28T12:00:00.000Z'),
+        });
+        await service.recordActivity({
+            type: 'callit.prediction.completed',
+            subjectUserId: 'subject-1',
+            target: { type: 'callit.prediction', id: 'prediction-1' },
+            data: {
+                trackerId: 'tracker-1',
+                trackerSymbol: 'AAPL',
+                direction: 'UP',
+                successful: true,
+            },
+            occurredAt: new Date('2026-10-28T13:00:00.000Z'),
+        });
+
+        const response = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body).toMatchObject({
+            items: [{
+                type: 'callit.prediction.completed',
+                actor: null,
+                subject: { id: 'subject-1', name: 'Bob', image: null },
+                target: { type: 'callit.prediction', id: 'prediction-1' },
+                data: { trackerSymbol: 'AAPL', direction: 'UP', successful: true },
+            }, {
+                type: 'callit.prediction.created',
+                actor: { id: 'actor-1', name: 'Alice' },
+                target: { type: 'callit.prediction', id: 'prediction-1' },
+                data: { trackerSymbol: 'AAPL', direction: 'UP' },
+            }],
+        });
+
+        predictionExists = false;
+        const hidden = await app().handle(new Request('http://localhost/activity-feed?limit=10'));
+        expect(await hidden.json()).toMatchObject({ items: [], nextCursor: null });
     });
 
     it('resolves current post tags on every activity feed read and omits deleted posts', async () => {

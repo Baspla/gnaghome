@@ -52,7 +52,12 @@ describe('PlatformEventSchema', () => {
             'crewnow.preferences.changed',
             'crewnow.post.changed',
             'crewnow.timeline.changed',
+            'crewnow.user-stats.changed',
             'user.profile.changed',
+            'callit.prediction.changed',
+            'callit.user-stats.changed',
+            'callit.tracker.changed',
+            'callit.settings.changed',
         ] as const;
         const actions = ['CREATED', 'UPDATED', 'DELETED'] as const;
 

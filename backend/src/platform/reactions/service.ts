@@ -37,6 +37,7 @@ export type ReactionTarget = { targetType: string; targetId: string };
 type ReactionError = BadRequestError | InternalError;
 type CustomEmojiLookup = (name: string) => Promise<boolean>;
 type ReactionCreatedHandler = (target: ReactionTarget, actorUserId: string) => Promise<void>;
+type ReactionChangedHandler = (target: ReactionTarget, action: ReactionChangedEvent['action']) => Promise<void>;
 
 function validTarget(targetType: unknown, targetId: unknown): targetType is string {
     return typeof targetType === 'string' && TARGET_TYPE_PATTERN.test(targetType)
@@ -71,6 +72,7 @@ export class ReactionsService {
         private readonly clock: () => Date = () => new Date(),
         private readonly customEmojiExists: CustomEmojiLookup = async () => false,
         private readonly onCreated: ReactionCreatedHandler = async () => {},
+        private readonly onChanged: ReactionChangedHandler = async () => {},
     ) {}
 
     async getReactions(targetType: string, targetId: string, viewerUserId: string): Promise<Result<ReactionCollection, ReactionError>> {
@@ -198,7 +200,14 @@ export class ReactionsService {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Die Reaktion konnte nicht gespeichert werden.' });
         }
 
-        if (action) await this.publishChanged({ targetType, targetId }, action);
+        if (action) {
+            await this.publishChanged({ targetType, targetId }, action);
+            try {
+                await this.onChanged({ targetType, targetId }, action);
+            } catch {
+                // Change observers must not undo a persisted reaction.
+            }
+        }
         if (created) {
             try {
                 await this.onCreated({ targetType, targetId }, actorUserId);
