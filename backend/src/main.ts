@@ -13,6 +13,7 @@ import { env } from './env';
 import { warnIfUsingInMemoryDatabase } from './db/persistence-warning';
 import { NOTIFICATION_TOPICS } from './platform/notifications/catalog';
 import { registerDailyCrewNowReminder, setupDailyCrewNowReminder } from './platform/notifications/reminder';
+import { registerCallItTasks, scheduleCallItSync, setupCallItSync } from './apps/callit/tasks';
 
 const logger = createLogger('app');
 warnIfUsingInMemoryDatabase(env.DATABASE_URL, process.env.NODE_ENV);
@@ -33,6 +34,7 @@ const {
     customEmoji: customEmojiService,
     crewnow: crewNowService,
     crewnowPreferences: crewNowPreferencesService,
+    callit: callItService,
     tasks: tasksService,
     notifications: notificationsService,
     reactions: reactionsService,
@@ -41,6 +43,8 @@ const registeredTopics = await notificationsService.registerTopics(NOTIFICATION_
 if (!registeredTopics.ok) logger.error('notification topics failed to register', { error: registeredTopics.error.message });
 registerDailyCrewNowReminder(tasksService, database.db, notificationsService);
 await setupDailyCrewNowReminder(tasksService);
+registerCallItTasks(tasksService, callItService);
+await setupCallItSync(tasksService, callItService);
 const initialFileCleanup = filesService.cleanupExpiredUploads();
 void initialFileCleanup.then((result) => {
     if (result.ok) {
@@ -71,12 +75,22 @@ const app = createApp({
     discussionsFeedService: discussionsService,
     reactionsService,
     canViewDiscussionTarget: async (viewerUserId, targetType, targetId) => {
-        if (targetType !== 'crewnow.post') return false;
-        return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+        if (targetType === 'crewnow.post') {
+            return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+        }
+        if (targetType === 'callit.tracker') {
+            return callItService.canViewTracker(viewerUserId, targetId);
+        }
+        return false;
     },
     canViewReactionTarget: async (viewerUserId, targetType, targetId) => {
-        if (targetType !== 'crewnow.post') return false;
-        return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+        if (targetType === 'crewnow.post') {
+            return (await crewNowService.getPostForActivity(viewerUserId, targetId)).ok;
+        }
+        if (targetType === 'callit.prediction') {
+            return callItService.canViewPrediction(viewerUserId, targetId);
+        }
+        return false;
     },
     notificationsService,
     vapidPublicKey: env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY ? env.VAPID_PUBLIC_KEY : undefined,
@@ -84,6 +98,11 @@ const app = createApp({
     customEmojiService,
     crewNowService,
     crewNowPreferencesService,
+    callitService: callItService,
+    rescheduleCallItSync: async (minutes) => {
+        const result = await scheduleCallItSync(tasksService, minutes);
+        if (!result.ok) throw new Error(result.error.message);
+    },
     realtimeModule: createRealtimeModule,
     generateRealtimeToken: generateCentrifugoToken,
 }).listen(3000);

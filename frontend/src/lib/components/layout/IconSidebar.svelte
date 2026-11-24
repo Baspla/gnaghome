@@ -8,6 +8,7 @@
     import Gamepad2 from "@lucide/svelte/icons/gamepad-2";
     import CalendarDays from "@lucide/svelte/icons/calendar-days";
     import Star from "@lucide/svelte/icons/star";
+    import TrendingUp from "@lucide/svelte/icons/trending-up";
 </script>
 
 <aside
@@ -23,6 +24,10 @@
 
         <IconSidebarElement href="/crewnow" label="CrewNow">
             <Camera class="h-5 w-5" />
+        </IconSidebarElement>
+
+        <IconSidebarElement href="/callit" label="Call it">
+            <TrendingUp class="h-5 w-5" />
         </IconSidebarElement>
 
         <IconSidebarElement href="/archive" label="Archive" disabled>

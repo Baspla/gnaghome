@@ -5,6 +5,8 @@
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import InlineText from '$lib/components/InlineText.svelte';
+    import CallItStatsCard from '$lib/components/callit/CallItStatsCard.svelte';
+    import CrewNowStatsCard from '$lib/components/crewnow/CrewNowStatsCard.svelte';
 
     let { data }: PageProps = $props();
     let refreshedProfile = $state<{ id: string; bio: string | null; accentColor: string } | null>(null);
@@ -73,6 +75,8 @@
                 {/if}
             </div>
             <p class="text-sm text-surface-600-400">Beigetreten am {joinedDate}</p>
+            <CrewNowStatsCard userId={profile.id} />
+            <CallItStatsCard userId={profile.id} />
         </div>
     </section>
 </main>

@@ -79,6 +79,7 @@ function makeTestApp() {
             getPostForActivity: async () => ok({} as never),
             getActivityTaggedUsers: async (_viewerUserId: string, ids: string[]) => ids.map((id) => ({ id, name: id, image: null })),
             getTagIdsForPost: async () => [],
+            getUserStats: async () => ok({ postCount: 3, taggedCount: 2, reactionCount: 5, commentCount: 1 }),
         },
         crewNowPreferencesService: {
             getPreferences: async () => ok({ mirrorFrontPreview: true, captureDelaySeconds: 1 }),
@@ -87,6 +88,77 @@ function makeTestApp() {
                 captureDelaySeconds: preferences.captureDelaySeconds as 1 | 2 | 3 | 5,
             }),
         },
+        callitService: {
+            getOverview: async () => ok({
+                myStats: {
+                    activePredictionCount: 0,
+                    activeWagerTotal: 0,
+                    allTimeProfit: 0,
+                    completedCount: 0,
+                    wins: 0,
+                    losses: 0,
+                },
+                limits: { maxActivePredictionsPerUser: 6 },
+                myActivePredictions: [],
+                otherActivePredictions: [],
+                leaderboard: [],
+            }),
+            getUserPage: async () => ok({
+                user: { id: 'user-1', name: 'Test User', image: null },
+                stats: {
+                    activePredictionCount: 0,
+                    activeWagerTotal: 0,
+                    allTimeProfit: 0,
+                    completedCount: 0,
+                    wins: 0,
+                    losses: 0,
+                },
+                limits: { maxActivePredictionsPerUser: 6 },
+                activePredictions: [],
+                completedPredictions: [],
+            }),
+            listActiveTrackers: async () => ok([]),
+            listActiveTrackersWithHistory: async () => ok([]),
+            getTrackerDetail: async () => ok({
+                tracker: {
+                    id: 'tracker-1',
+                    symbol: 'AAPL',
+                    name: 'Apple Inc.',
+                    currency: 'USD',
+                    isActive: true,
+                    lastPrice: 100,
+                    lastPriceAt: new Date(),
+                    discussionId: 'discussion-1',
+                },
+                commentCount: 0,
+                history: [],
+                activePredictions: [],
+                completedPredictions: [],
+            }),
+            createPrediction: async () => ok({} as never),
+            listAllTrackersForAdmin: async () => ok([]),
+            previewTracker: async () => ok({} as never),
+            addTracker: async () => ok({} as never),
+            removeTracker: async () => ok(null),
+            fullyRemoveTracker: async () => ok(null),
+            getSettings: async () => ok({
+                updateIntervalMinutes: 15,
+                maxActivePredictionsPerUser: 6,
+                lastSyncAt: null,
+                lastSyncError: null,
+                updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+            }),
+            updateSettings: async (_userId, settings) => ok({
+                updateIntervalMinutes: settings.updateIntervalMinutes ?? 15,
+                maxActivePredictionsPerUser: settings.maxActivePredictionsPerUser ?? 6,
+                lastSyncAt: null,
+                lastSyncError: null,
+                updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+            }),
+            canViewPrediction: async () => false,
+            canViewTracker: async () => false,
+        },
+        rescheduleCallItSync: async () => {},
         realtimeModule: createRealtimeModule,
         generateRealtimeToken: async () => ok('test-token'),
     });
@@ -146,6 +218,22 @@ describe('backend HTTP app', () => {
         expect(await timelineResponse.json()).toEqual({ items: [], nextCursor: null });
         expect(usersResponse.status).toBe(200);
         expect(await usersResponse.json()).toEqual({ items: [] });
+    });
+
+    it('serves CrewNow profile stats to signed-in users', async () => {
+        const unauthorized = await makeTestApp().handle(new Request('http://localhost/api/v1/crewnow/users/user-1/stats'));
+        expect(unauthorized.status).toBe(401);
+
+        session = { user: sessionUser, session: { id: 'session-1' } };
+        const response = await makeTestApp().handle(new Request('http://localhost/api/v1/crewnow/users/user-1/stats'));
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            postCount: 3,
+            taggedCount: 2,
+            reactionCount: 5,
+            commentCount: 1,
+        });
     });
 
     it('provides notification topics to signed-in users and requires authentication for settings', async () => {

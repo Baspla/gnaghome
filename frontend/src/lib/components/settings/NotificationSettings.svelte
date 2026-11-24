@@ -15,6 +15,7 @@
     };
 
     const appLabels: Record<string, string> = {
+        callit: 'Call it',
         crewnow: 'CrewNow',
         discussions: 'Diskussionen',
     };

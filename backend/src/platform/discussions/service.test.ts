@@ -23,6 +23,8 @@ describe('DiscussionsService', () => {
         notifications = { notifyUsers: mock(async () => {}) };
         service = new DiscussionsService(database.db, broadcast, notifications, async (_targetType, targetId) =>
             targetId === 'post-1' ? 'user-1' : null);
+        service.setTargetUrlResolver(async (targetType, targetId) =>
+            targetType === 'crewnow.post' ? `/crewnow/posts/${encodeURIComponent(targetId)}` : null);
         const createdDiscussion = await service.getOrCreateDiscussion('crewnow.post', 'post-1');
         expect(createdDiscussion.ok).toBe(true);
         if (!createdDiscussion.ok) throw new Error('discussion setup failed');
@@ -43,6 +45,21 @@ describe('DiscussionsService', () => {
         expect(first.value.id).toBe(second.value.id);
         expect(first.value.targetType).toBe('crewnow.post');
         expect(first.value.targetId).toBe('post-2');
+    });
+
+    it('notifies the target change handler when comments are created or deleted', async () => {
+        const onMessageChanged = mock(async () => {});
+        service.setTargetMessageChangedHandler(onMessageChanged);
+
+        const created = await service.createMessage(discussionId, 'user-1', 'Hallo');
+        expect(created.ok).toBe(true);
+        expect(onMessageChanged).toHaveBeenCalledTimes(1);
+        expect(onMessageChanged).toHaveBeenCalledWith(discussionId);
+        if (!created.ok) return;
+
+        await service.deleteMessage(created.value.id, 'user-1');
+        expect(onMessageChanged).toHaveBeenCalledTimes(2);
+        expect(onMessageChanged).toHaveBeenLastCalledWith(discussionId);
     });
 
     it('deletes a discussion and cascades its messages', async () => {
@@ -141,5 +158,23 @@ describe('DiscussionsService', () => {
             await service.editMessage(participantReply.value.id, 'user-3', 'Bearbeitet');
         }
         expect(notifications.notifyUsers).toHaveBeenCalledTimes(4);
+    });
+
+    it('uses the app-provided target URL for tracker discussion notifications', async () => {
+        service.setTargetUrlResolver(async (targetType, targetId) =>
+            targetType === 'callit.tracker' ? `/callit/trackers/${encodeURIComponent(targetId)}` : null);
+        const trackerDiscussion = await service.getOrCreateDiscussion('callit.tracker', 'tracker-1');
+        expect(trackerDiscussion.ok).toBe(true);
+        if (!trackerDiscussion.ok) return;
+
+        await service.createMessage(trackerDiscussion.value.id, 'user-2', 'Erster Kommentar');
+        await service.createMessage(trackerDiscussion.value.id, 'user-3', 'Antwort');
+
+        expect(notifications.notifyUsers).toHaveBeenCalledTimes(1);
+        expect(notifications.notifyUsers.mock.calls[0]?.[0]).toBe('discussions.new-message');
+        expect(notifications.notifyUsers.mock.calls[0]?.[1]).toEqual(['user-2']);
+        expect(notifications.notifyUsers.mock.calls[0]?.[2]).toMatchObject({
+            url: '/callit/trackers/tracker-1',
+        });
     });
 });

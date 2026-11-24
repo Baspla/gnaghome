@@ -8,3 +8,4 @@ export * from '../platform/tasks/schema';
 export * from '../platform/notifications/schema';
 export * from '../platform/custom-emoji/schema';
 export * from '../apps/crewnow/schema';
+export * from '../apps/callit/schema';

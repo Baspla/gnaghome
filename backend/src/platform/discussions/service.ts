@@ -22,6 +22,7 @@ export type DiscussionMessageSummary = {
 };
 
 type DiscussionError = BadRequestError | ForbiddenError | InternalError | NotFoundError;
+type DiscussionMessageChangedHandler = (discussionId: string) => Promise<void>;
 
 export class DiscussionsService {
     constructor(
@@ -29,10 +30,20 @@ export class DiscussionsService {
         private readonly broadcast: BroadcastPublisher,
         private readonly notifications: Pick<NotificationsService, 'notifyUsers'> = { notifyUsers: async () => {} },
         private getTargetOwner: (targetType: string, targetId: string) => Promise<string | null> = async () => null,
+        private getTargetUrl: (targetType: string, targetId: string) => Promise<string | null> = async () => null,
+        private onMessageChanged: DiscussionMessageChangedHandler = async () => {},
     ) {}
 
     setTargetOwnerResolver(resolver: (targetType: string, targetId: string) => Promise<string | null>): void {
         this.getTargetOwner = resolver;
+    }
+
+    setTargetUrlResolver(resolver: (targetType: string, targetId: string) => Promise<string | null>): void {
+        this.getTargetUrl = resolver;
+    }
+
+    setTargetMessageChangedHandler(handler: DiscussionMessageChangedHandler): void {
+        this.onMessageChanged = handler;
     }
 
     async getOrCreateDiscussion(targetType: string, targetId: string): Promise<Result<typeof discussion.$inferSelect, BadRequestError | InternalError>> {
@@ -159,6 +170,7 @@ export class DiscussionsService {
             if (!row) return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
             await this.notifyNewMessage(discussionResult.value, authorUserId);
             await this.publishChanged(discussionId, 'CREATED');
+            await this.notifyMessageChanged(discussionId);
             return ok({ ...row, author, canEdit: true });
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gespeichert werden.' });
@@ -167,6 +179,9 @@ export class DiscussionsService {
 
     private async notifyNewMessage(target: typeof discussion.$inferSelect, authorUserId: string): Promise<void> {
         try {
+            const targetUrl = await this.getTargetUrl(target.targetType, target.targetId);
+            if (!targetUrl) return;
+
             const postAuthorId = target.targetType === 'crewnow.post'
                 ? await this.getTargetOwner(target.targetType, target.targetId)
                 : null;
@@ -183,7 +198,7 @@ export class DiscussionsService {
                     await this.notifications.notifyUsers('discussions.post-comment', [postAuthorId], {
                         title: 'Neuer Kommentar zu deinem CrewNow',
                         body: 'Jemand hat deinen CrewNow kommentiert.',
-                        url: `/crewnow/posts/${encodeURIComponent(target.targetId)}`,
+                        url: targetUrl,
                     });
                 }
             }
@@ -193,7 +208,7 @@ export class DiscussionsService {
                 await this.notifications.notifyUsers('discussions.new-message', [...recipients], {
                     title: 'Neue Nachricht in einer Diskussion',
                     body: 'In einer Diskussion, an der du teilnimmst, gibt es eine neue Nachricht.',
-                    url: target.targetType === 'crewnow.post' ? `/crewnow/posts/${encodeURIComponent(target.targetId)}` : '/',
+                    url: targetUrl,
                 });
             }
         } catch {
@@ -241,6 +256,7 @@ export class DiscussionsService {
             const row = deleted[0];
             if (!row) return err({ status: 404, code: 'NOT_FOUND', message: 'Kommentar nicht gefunden.' });
             await this.publishChanged(row.discussionId, 'DELETED');
+            await this.notifyMessageChanged(row.discussionId);
             return ok(null);
         } catch {
             return err({ status: 500, code: 'INTERNAL_ERROR', message: 'Der Kommentar konnte nicht gelöscht werden.' });
@@ -260,6 +276,14 @@ export class DiscussionsService {
             if (!result.ok) console.warn('Activity feed update broadcast failed', result.error.message);
         } catch {
             // The feed event prompts a visible feed to refetch; persisted data remains authoritative.
+        }
+    }
+
+    private async notifyMessageChanged(discussionId: string): Promise<void> {
+        try {
+            await this.onMessageChanged(discussionId);
+        } catch {
+            // Change observers are best-effort and cannot fail a persisted discussion message.
         }
     }
 

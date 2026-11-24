@@ -8,6 +8,7 @@ import { createRealtimeModule } from './platform/realtime';
 import { createActivityFeedModule } from './platform/activity-feed/module';
 import { createFilesModule } from './platform/files/module';
 import { createCrewNowModule } from './apps/crewnow/module';
+import { createCallItModule } from './apps/callit/module';
 import { createDiscussionsModule } from './platform/discussions/module';
 import { createNotificationsModule } from './platform/notifications/module';
 import { createCustomEmojiModule } from './platform/custom-emoji/module';
@@ -19,8 +20,26 @@ type UserServiceDependency = Pick<import('./platform/users/service').UserService
 type ActivityFeedServiceDependency = Pick<import('./platform/activity-feed/service').ActivityFeedService, 'getFeed'>;
 type FilesServiceDependency = Pick<import('./platform/files/service').FilesService, 'uploadFile' | 'getFile'>;
 type CustomEmojiServiceDependency = Pick<import('./platform/custom-emoji/service').CustomEmojiService, 'getCatalog' | 'createEmoji' | 'deleteEmoji'>;
-type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
+type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getUserStats' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 type CrewNowPreferencesServiceDependency = Pick<import('./apps/crewnow/preferences').CrewNowPreferencesService, 'getPreferences' | 'updatePreferences'>;
+type CallItServiceDependency = Pick<
+    import('./apps/callit/service').CallItService,
+    | 'getOverview'
+    | 'getUserPage'
+    | 'listActiveTrackers'
+    | 'listActiveTrackersWithHistory'
+    | 'getTrackerDetail'
+    | 'createPrediction'
+    | 'listAllTrackersForAdmin'
+    | 'previewTracker'
+    | 'addTracker'
+    | 'removeTracker'
+    | 'fullyRemoveTracker'
+    | 'getSettings'
+    | 'updateSettings'
+    | 'canViewPrediction'
+    | 'canViewTracker'
+>;
 type DiscussionsServiceDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getDiscussion' | 'getMessage' | 'getMessages' | 'createMessage' | 'editMessage' | 'deleteMessage'>;
 type DiscussionsFeedDependency = Pick<import('./platform/discussions/service').DiscussionsService, 'getMessageCounts'>;
 type DiscussionTargetAuthorizer = import('./platform/discussions/module').DiscussionTargetAuthorizer;
@@ -37,6 +56,8 @@ export type AppDependencies = {
     customEmojiService: CustomEmojiServiceDependency;
     crewNowService: CrewNowServiceDependency;
     crewNowPreferencesService: CrewNowPreferencesServiceDependency;
+    callitService: CallItServiceDependency;
+    rescheduleCallItSync: (minutes: number) => Promise<void>;
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
     reactionsService: ReactionsServiceDependency;
@@ -92,13 +113,14 @@ export function createApp(dependencies: AppDependencies) {
                         .get('/health', () => ({ status: 'ok' }))
                         .get('/status', () => ({ status: 'online' }))
                         .use(createUserModule(authMiddleware, dependencies.userService))
-                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService, dependencies.reactionsService))
+                        .use(createActivityFeedModule(authMiddleware, dependencies.activityFeedService, dependencies.userService, dependencies.crewNowService, dependencies.discussionsFeedService, dependencies.reactionsService, dependencies.callitService))
                         .use(createDiscussionsModule(authMiddleware, dependencies.discussionsService, dependencies.canViewDiscussionTarget))
                         .use(createReactionsModule(authMiddleware, dependencies.reactionsService, dependencies.canViewReactionTarget))
                         .use(createNotificationsModule(authMiddleware, dependencies.notificationsService, dependencies.vapidPublicKey))
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCustomEmojiModule(authMiddleware, dependencies.customEmojiService))
                         .use(createCrewNowModule(authMiddleware, dependencies.crewNowService, dependencies.crewNowPreferencesService))
+                        .use(createCallItModule(authMiddleware, dependencies.callitService, dependencies.rescheduleCallItSync))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )
         );

@@ -1,7 +1,7 @@
 <script lang="ts">
     import Button from '$lib/components/Button.svelte';
     import InlineText from '$lib/components/InlineText.svelte';
-    import PostReactions from './PostReactions.svelte';
+    import Reactions from '$lib/components/Reactions.svelte';
     type Props = {
         backImageUrl: string;
         frontImageUrl: string;
@@ -85,7 +85,7 @@
             </Button>
         {/if}
         <div class="absolute bottom-3 right-3 z-10">
-            <PostReactions {postId} count={reactionCount} {reactionEmoji} onReactionsChange={onReactionsChange} />
+            <Reactions targetType="crewnow.post" targetId={postId} count={reactionCount} {reactionEmoji} onReactionsChange={onReactionsChange} />
         </div>
     </div>
     {#if caption}

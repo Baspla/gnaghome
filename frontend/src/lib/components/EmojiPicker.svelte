@@ -50,7 +50,11 @@
         { value: '🤓', label: 'Nerd', keywords: ['nerd', 'geek', 'glasses', 'brille', 'streber'] },
         { value: '💩', label: 'Kackhaufen', keywords: ['poop', 'shit', 'poo', 'kacke', 'scheiße', 'haufen'] },
         { value: '🫪', label: 'Wahnsinn', keywords: ['closeup', 'lens', 'freaky', 'nah','distorted'] },
-        { value: '🤔', label: 'Nachdenkend', keywords: ['thinking', 'pondering', 'curious', 'nachdenklich', 'überlegen', 'reflektieren'] }
+        { value: '🤔', label: 'Nachdenkend', keywords: ['thinking', 'pondering', 'curious', 'nachdenklich', 'überlegen', 'reflektieren'] },
+        { value: '🥶', label: 'Kalt', keywords: ['cold', 'freezing', 'chilly', 'kalt', 'gefrierend', 'kühl'] },
+        { value: '💰', label: 'Geld', keywords: ['money', 'cash', 'wealth', 'geld', 'geldbeutel', 'reichtum'] },
+        { value: '📈', label: 'Steigender Kurs', keywords: ['rising', 'upward', 'increasing', 'steigend', 'hoch', 'zunehmend'] },
+        { value: '📉', label: 'Fallender Kurs', keywords: ['falling', 'downward', 'decreasing', 'fallend', 'runter', 'abnehmend'] },
     ];
     const normalizedQuery = $derived(searchQuery.trim().toLowerCase());
     const filteredEmojis = $derived(normalEmojis.filter((emoji) =>

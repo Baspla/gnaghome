@@ -9,6 +9,10 @@ export type {
     CrewNowPreferencesChangedEvent,
     CrewNowPostChangedEvent,
     CrewNowTimelineChangedEvent,
+    CallItPredictionChangedEvent,
+    CallItUserStatsChangedEvent,
+    CallItTrackerChangedEvent,
+    CallItSettingsChangedEvent,
     PlatformEventAction,
     PlatformEvent,
 } from './platform-event';

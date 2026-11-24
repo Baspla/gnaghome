@@ -6,19 +6,28 @@
     import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
+    import { directionLabel } from '$lib/components/callit/format';
     import { ChevronRight, Heart, MessageCircle } from '@lucide/svelte';
     import { setPageTitle } from '$lib/utils';
 
     type Activity = {
         id: string;
-        type: 'crewnow.image_posted' | 'profile.updated' | 'profile.birthday';
+        type: 'crewnow.image_posted' | 'profile.updated' | 'profile.birthday' | 'callit.prediction.created' | 'callit.prediction.completed';
         actor: { id: string; name: string; image: string | null } | null;
         subject: { id: string; name: string; image: string | null } | null;
         target: { type: string; id: string } | null;
         discussionId: string | null;
         commentCount: number;
         reactionCount: number;
-        data: { changedFields?: Array<'name' | 'image'>; imageFileId?: string; taggedUsers?: Array<{ id: string; name: string; image: string | null }> };
+        data: {
+            changedFields?: Array<'name' | 'image'>;
+            imageFileId?: string;
+            taggedUsers?: Array<{ id: string; name: string; image: string | null }>;
+            trackerId?: string;
+            trackerSymbol?: string;
+            direction?: 'UP' | 'DOWN';
+            successful?: boolean;
+        };
         occurredAt: string;
     };
 
@@ -50,6 +59,10 @@
         if (activity.type === 'crewnow.image_posted' && activity.target?.type === 'crewnow.post') {
             return `/crewnow/posts/${encodeURIComponent(activity.target.id)}`;
         }
+        if ((activity.type === 'callit.prediction.created' || activity.type === 'callit.prediction.completed')
+            && activity.data.trackerId) {
+            return `/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`;
+        }
         return null;
     }
 
@@ -57,7 +70,12 @@
         if (activity.discussionId) {
             return `${activity.commentCount} ${activity.commentCount === 1 ? 'Kommentar' : 'Kommentare'} öffnen`;
         }
+        if (activity.target?.type === 'callit.prediction') return 'Tracker öffnen';
         return activity.target?.type === 'crewnow.post' ? 'CrewNow öffnen' : 'Profil öffnen';
+    }
+
+    function callItDirection(activity: Activity): string {
+        return activity.data.direction ? directionLabel(activity.data.direction) : '';
     }
 
     async function loadActivities(append: boolean) {
@@ -205,6 +223,38 @@
                                         {/if}
                                     {/if}
                                     <span> gepostet.</span>
+                                {:else if activity.type === 'callit.prediction.created'}
+                                    <span> hat eine Vorhersage auf </span>
+                                    {#if activity.data.trackerId && activity.data.trackerSymbol}
+                                        <a
+                                            class="font-semibold text-primary-700-300 hover:underline"
+                                            href={`/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`}
+                                        >{activity.data.trackerSymbol}</a>
+                                    {:else}
+                                        <span class="font-semibold">{activity.data.trackerSymbol ?? 'einen Tracker'}</span>
+                                    {/if}
+                                    {#if activity.data.direction}
+                                        <span> ({callItDirection(activity)})</span>
+                                    {/if}
+                                    <span> platziert.</span>
+                                {:else if activity.type === 'callit.prediction.completed'}
+                                    <span> hat die Vorhersage auf </span>
+                                    {#if activity.data.trackerId && activity.data.trackerSymbol}
+                                        <a
+                                            class="font-semibold text-primary-700-300 hover:underline"
+                                            href={`/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`}
+                                        >{activity.data.trackerSymbol}</a>
+                                    {:else}
+                                        <span class="font-semibold">{activity.data.trackerSymbol ?? 'einen Tracker'}</span>
+                                    {/if}
+                                    {#if activity.data.direction}
+                                        <span> ({callItDirection(activity)})</span>
+                                    {/if}
+                                    <span> abgeschlossen – </span>
+                                    <span class={activity.data.successful ? 'font-semibold text-success-600-400' : 'font-semibold text-error-600-400'}>
+                                        {activity.data.successful ? 'erfolgreich' : 'nicht erfolgreich'}
+                                    </span>
+                                    <span>.</span>
                                 {:else}
                                     <span>{activityDescription(activity)}</span>
                                 {/if}

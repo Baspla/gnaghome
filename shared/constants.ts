@@ -8,6 +8,7 @@ export const Modules = {
     FILES: 'files',
     CUSTOM_EMOJI: 'custom-emoji',
     NOTIFICATIONS: 'notifications',
+    CALL_IT: 'callit',
 } as const;
 
 export const RealtimeChannels = {

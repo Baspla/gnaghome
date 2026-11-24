@@ -15,6 +15,8 @@ export const ACTIVITY_TYPES = [
     'profile.birthday',
     'games.game_added',
     'calendar.event_started',
+    'callit.prediction.created',
+    'callit.prediction.completed',
 ] as const;
 
 export type ActivityType = typeof ACTIVITY_TYPES[number];
@@ -25,6 +27,17 @@ export type ActivityDataByType = {
     'profile.birthday': Record<string, never>;
     'games.game_added': { gameId: string };
     'calendar.event_started': { title: string };
+    'callit.prediction.created': {
+        trackerId: string;
+        trackerSymbol: string;
+        direction: 'UP' | 'DOWN';
+    };
+    'callit.prediction.completed': {
+        trackerId: string;
+        trackerSymbol: string;
+        direction: 'UP' | 'DOWN';
+        successful: boolean;
+    };
 };
 
 export type ActivityTarget = {
@@ -68,6 +81,18 @@ export type RecordActivityInput =
         subjectUserId?: string | null;
         target: ActivityTarget & { type: 'calendar.event' };
         data: ActivityDataByType['calendar.event_started'];
+    })
+    | (ActivityInputBase<'callit.prediction.created'> & {
+        actorUserId: string;
+        subjectUserId?: string | null;
+        target: ActivityTarget & { type: 'callit.prediction' };
+        data: ActivityDataByType['callit.prediction.created'];
+    })
+    | (ActivityInputBase<'callit.prediction.completed'> & {
+        actorUserId?: null;
+        subjectUserId: string;
+        target: ActivityTarget & { type: 'callit.prediction' };
+        data: ActivityDataByType['callit.prediction.completed'];
     });
 
 export type ActivityFeedRecord = {
@@ -125,6 +150,20 @@ function isValidActivityData(type: ActivityType, data: unknown): data is Activit
             && typeof data.title === 'string'
             && data.title.trim().length > 0;
     }
+    if (type === 'callit.prediction.created' || type === 'callit.prediction.completed') {
+        const expectedKeys = type === 'callit.prediction.created'
+            ? ['trackerId', 'trackerSymbol', 'direction']
+            : ['trackerId', 'trackerSymbol', 'direction', 'successful'];
+        return Object.keys(data).length === expectedKeys.length
+            && expectedKeys.every((key) => key in data)
+            && typeof data.trackerId === 'string'
+            && data.trackerId.trim().length > 0
+            && typeof data.trackerSymbol === 'string'
+            && data.trackerSymbol.trim().length > 0
+            && data.trackerSymbol.length <= 20
+            && (data.direction === 'UP' || data.direction === 'DOWN')
+            && (type === 'callit.prediction.created' || typeof data.successful === 'boolean');
+    }
     if (type !== 'profile.updated') return false;
 
     const keys = Object.keys(data);
@@ -146,6 +185,8 @@ function isNamespacedTargetType(type: ActivityType, value: unknown): value is st
         'profile.birthday': 'platform.profile',
         'games.game_added': 'games.library_entry',
         'calendar.event_started': 'calendar.event',
+        'callit.prediction.created': 'callit.prediction',
+        'callit.prediction.completed': 'callit.prediction',
     };
     const expectedTargetType = targetTypes[type];
     return expectedTargetType !== undefined && value === expectedTargetType;
@@ -204,6 +245,14 @@ function hasValidActivityReferences(input: {
     }
     if (input.type === 'crewnow.image_posted') return input.actorUserId != null && input.target?.type === 'crewnow.post';
     if (input.type === 'games.game_added') return input.actorUserId != null && input.target?.type === 'games.library_entry';
+    if (input.type === 'callit.prediction.created') {
+        return input.actorUserId != null && input.target?.type === 'callit.prediction';
+    }
+    if (input.type === 'callit.prediction.completed') {
+        return typeof input.subjectUserId === 'string'
+            && (input.actorUserId === undefined || input.actorUserId === null)
+            && input.target?.type === 'callit.prediction';
+    }
     if (input.type === 'profile.updated') {
         return input.actorUserId != null
             && input.subjectUserId != null

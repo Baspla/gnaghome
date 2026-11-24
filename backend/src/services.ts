@@ -11,6 +11,8 @@ import { NotificationsService } from './platform/notifications/service';
 import { createWebPushSender, type VapidConfig } from './platform/notifications/push';
 import { CustomEmojiService } from './platform/custom-emoji/service';
 import { ReactionsService } from './platform/reactions/service';
+import { CallItService } from './apps/callit/service';
+import { YahooFinanceMarketData } from './integrations/yahoo-finance/client';
 
 export function createServices(
     db: AppDatabase,
@@ -41,11 +43,27 @@ export function createServices(
                 url: `/crewnow/posts/${encodeURIComponent(target.targetId)}`,
             });
         },
+        async (target) => {
+            if (target.targetType !== 'crewnow.post') return;
+            await crewnow.notifyStatsChangedForPost(target.targetId);
+        },
     );
     crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications, broadcast, reactions);
     const crewnowPreferences = new CrewNowPreferencesService(db, broadcast);
+    const callit = new CallItService(db, new YahooFinanceMarketData(), discussions, activityFeed, notifications, broadcast, reactions);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);
+    discussions.setTargetUrlResolver(async (targetType, targetId) => {
+        if (targetType === 'crewnow.post') return `/crewnow/posts/${encodeURIComponent(targetId)}`;
+        if (targetType === 'callit.tracker') return `/callit/trackers/${encodeURIComponent(targetId)}`;
+        return null;
+    });
+    discussions.setTargetMessageChangedHandler(async (discussionId) => {
+        const discussion = await discussions.getDiscussion(discussionId);
+        if (discussion.ok && discussion.value.targetType === 'crewnow.post') {
+            await crewnow.notifyStatsChangedForPost(discussion.value.targetId);
+        }
+    });
 
-    return { users, activityFeed, discussions, reactions, files, customEmoji, crewnow, crewnowPreferences, tasks, notifications };
+    return { users, activityFeed, discussions, reactions, files, customEmoji, crewnow, crewnowPreferences, callit, tasks, notifications };
 }

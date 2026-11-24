@@ -3,7 +3,7 @@ import type { createAuthMiddleware } from '../../platform/auth';
 import type { CrewNowService } from './service';
 import type { CrewNowPreferencesService } from './preferences';
 
-type Service = Pick<CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers'>;
+type Service = Pick<CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getUserStats'>;
 type PreferencesService = Pick<CrewNowPreferencesService, 'getPreferences' | 'updatePreferences'>;
 
 function cursorDate(value?: string) {
@@ -41,6 +41,14 @@ export function createCrewNowModule(
             return { items: result.value.map((profile) => ({ ...profile, isSelf: profile.id === user.id })) };
         }, {
             query: t.Object({ q: t.Optional(t.String({ maxLength: 80 })), limit: t.Optional(t.Numeric({ minimum: 1, maximum: 50 })) }),
+            auth: true,
+        })
+        .get('/users/:id/stats', async ({ params, status }) => {
+            const result = await service.getUserStats(params.id);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return result.value;
+        }, {
+            params: t.Object({ id: t.String({ minLength: 1, maxLength: 128 }) }),
             auth: true,
         })
         .get('/timeline', async ({ user, query, status }) => {
