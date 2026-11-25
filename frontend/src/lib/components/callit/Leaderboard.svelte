@@ -48,8 +48,7 @@
                                 {#if entry.completedCount > 0}· {/if}
                             {/if}
                             {#if entry.completedCount > 0}
-                                {entry.completedCount} {entry.completedCount === 1 ? 'Vorhersage' : 'Vorhersagen'}
-                                · {entry.wins} gewonnen
+                                {entry.wins} gewonnen
                                 · {entry.losses} verloren
                             {:else if entry.activeCount === 0}
                                 Noch keine Vorhersage

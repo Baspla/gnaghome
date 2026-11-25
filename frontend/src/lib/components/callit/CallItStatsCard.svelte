@@ -65,15 +65,15 @@
                 <dd class="text-lg font-bold text-surface-950-50">{formatEuroPoints(stats.activeWagerTotal)}</dd>
             </div>
             <div>
-                <dt class="text-xs text-surface-600-400">Allzeit-Gewinn</dt>
-                <dd class="text-lg font-bold {stats.allTimeProfit > 0 ? 'text-success-700-300' : stats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
-                    {formatEuroPoints(stats.allTimeProfit, true)}
+                <dt class="text-xs text-surface-600-400">Aktive Rendite</dt>
+                <dd class="text-lg font-bold {stats.unrealizedProfit > 0 ? 'text-success-700-300' : stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatEuroPoints(stats.unrealizedProfit, true)}
                 </dd>
             </div>
             <div>
-                <dt class="text-xs text-surface-600-400">Aktuell</dt>
-                <dd class="text-lg font-bold {stats.unrealizedProfit > 0 ? 'text-success-700-300' : stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
-                    {formatEuroPoints(stats.unrealizedProfit, true)}
+                <dt class="text-xs text-surface-600-400">Allzeit-Gewinn</dt>
+                <dd class="text-lg font-bold {stats.allTimeProfit > 0 ? 'text-success-700-300' : stats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatEuroPoints(stats.allTimeProfit, true)}
                 </dd>
             </div>
             <div>

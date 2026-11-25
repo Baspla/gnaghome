@@ -109,7 +109,7 @@
                 <p class="text-xs text-surface-600-400" title={`Bezogen auf ${formatEuroPoints(data.stats.allTimeWagerTotal)} Einsatz`}>
                     Rendite: <span class="font-semibold {data.stats.returnPercent !== null && data.stats.returnPercent > 0 ? 'text-success-700-300' : data.stats.returnPercent !== null && data.stats.returnPercent < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatPercent(data.stats.returnPercent)}</span>
                 </p>
-                <p class="text-xs text-surface-600-400">Aktuell: <span class="font-semibold {data.stats.unrealizedProfit > 0 ? 'text-success-700-300' : data.stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatEuroPoints(data.stats.unrealizedProfit, true)}</span></p>
+                <p class="text-xs text-surface-600-400">Aktive Rendite: <span class="font-semibold {data.stats.unrealizedProfit > 0 ? 'text-success-700-300' : data.stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatEuroPoints(data.stats.unrealizedProfit, true)}</span></p>
                 <p class="text-xs text-surface-600-400">Aktiver Einsatz: {formatEuroPoints(data.stats.activeWagerTotal)}</p>
             </div>
         </section>
