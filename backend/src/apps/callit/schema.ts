@@ -19,15 +19,17 @@ export const callItTracker = sqliteTable('callit_tracker', {
     uniqueIndex('callit_tracker_discussion_uidx').on(table.discussionId),
 ]);
 
-export const callItPriceSnapshot = sqliteTable('callit_price_snapshot', {
+export const callItPriceCandle = sqliteTable('callit_price_candle', {
     trackerId: text('tracker_id').notNull().references(() => callItTracker.id, { onDelete: 'cascade' }),
-    observedAt: integer('observed_at', { mode: 'timestamp' }).notNull(),
-    price: real('price').notNull(),
-    currency: text('currency'),
-    source: text('source', { enum: ['sync', 'backfill', 'quote', 'history'] }).notNull().default('sync'),
-    fetchedAt: integer('fetched_at', { mode: 'timestamp' }).notNull(),
+    interval: text('interval', { enum: ['1h', '1d'] }).notNull(),
+    ts: integer('ts', { mode: 'timestamp' }).notNull(),
+    open: real('open').notNull(),
+    high: real('high').notNull(),
+    low: real('low').notNull(),
+    close: real('close').notNull(),
+    volume: integer('volume'),
 }, (table) => [
-    primaryKey({ columns: [table.trackerId, table.observedAt] }),
+    primaryKey({ columns: [table.trackerId, table.interval, table.ts] }),
 ]);
 
 export const callItPrediction = sqliteTable('callit_prediction', {
@@ -63,6 +65,6 @@ export const callItSettings = sqliteTable('callit_settings', {
 });
 
 export type CallItTracker = typeof callItTracker.$inferSelect;
-export type CallItPriceSnapshot = typeof callItPriceSnapshot.$inferSelect;
+export type CallItPriceCandle = typeof callItPriceCandle.$inferSelect;
 export type CallItPrediction = typeof callItPrediction.$inferSelect;
 export type CallItSettings = typeof callItSettings.$inferSelect;

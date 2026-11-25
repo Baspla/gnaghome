@@ -85,6 +85,20 @@
       "when": 1795471119261,
       "tag": "0011_closed_ultimates",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795610862612,
+      "tag": "0012_callit_price_candle",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1795610870402,
+      "tag": "0013_drop_callit_price_snapshot",
+      "breakpoints": true
     }
   ]
 }

@@ -23,21 +23,25 @@ export type MarketQuote = {
     marketState: string | null;
 };
 
-export type MarketHistoryPoint = {
-    observedAt: Date;
-    price: number;
+export type MarketCandle = {
+    ts: Date;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number | null;
 };
 
 export type MarketHistoryOptions = {
     from: Date;
     to: Date;
-    interval?: '15m' | '1d';
+    interval?: '1h' | '1d';
 };
 
 export interface MarketDataClient {
     fetchQuotes(symbols: string[]): Promise<Result<MarketQuote[], InternalError>>;
     fetchQuote(symbol: string): Promise<Result<MarketQuote | null, InternalError>>;
-    fetchHistory(symbol: string, options: MarketHistoryOptions): Promise<Result<MarketHistoryPoint[], InternalError>>;
+    fetchHistory(symbol: string, options: MarketHistoryOptions): Promise<Result<MarketCandle[], InternalError>>;
 }
 
 type YahooQuoteLike = {
@@ -61,7 +65,11 @@ type YahooChartLike = {
     };
     quotes?: Array<{
         date: Date;
+        open: number | null;
+        high: number | null;
+        low: number | null;
         close: number | null;
+        volume: number | null;
     }>;
 };
 
@@ -88,6 +96,10 @@ function toDate(value: unknown): Date | null {
         return new Date(value > 1_000_000_000_000 ? value : value * 1_000);
     }
     return null;
+}
+
+function isPositivePrice(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function toQuote(value: unknown, fallbackSymbol: string): MarketQuote | null {
@@ -188,7 +200,7 @@ export class YahooFinanceMarketData implements MarketDataClient {
         return ok(quotes);
     }
 
-    async fetchHistory(symbol: string, options: MarketHistoryOptions): Promise<Result<MarketHistoryPoint[], InternalError>> {
+    async fetchHistory(symbol: string, options: MarketHistoryOptions): Promise<Result<MarketCandle[], InternalError>> {
         const normalized = normalizeSymbol(symbol);
         if (!normalized) return ok([]);
         try {
@@ -197,20 +209,34 @@ export class YahooFinanceMarketData implements MarketDataClient {
                 {
                     period1: options.from,
                     period2: options.to,
-                    interval: options.interval ?? '15m',
+                    interval: options.interval ?? '1h',
                     includePrePost: false,
                     return: 'array',
                 },
                 moduleOptions(),
             );
             const chart = (typeof result === 'object' && result !== null ? result : {}) as YahooChartLike;
-            const byTimestamp = new Map<number, MarketHistoryPoint>();
+            const byTimestamp = new Map<number, MarketCandle>();
             for (const point of chart.quotes ?? []) {
                 if (!(point.date instanceof Date) || !Number.isFinite(point.date.getTime())) continue;
-                if (typeof point.close !== 'number' || !Number.isFinite(point.close) || point.close <= 0) continue;
-                byTimestamp.set(point.date.getTime(), { observedAt: point.date, price: point.close });
+                if (!isPositivePrice(point.open)
+                    || !isPositivePrice(point.high)
+                    || !isPositivePrice(point.low)
+                    || !isPositivePrice(point.close)) {
+                    continue;
+                }
+                byTimestamp.set(point.date.getTime(), {
+                    ts: point.date,
+                    open: point.open,
+                    high: point.high,
+                    low: point.low,
+                    close: point.close,
+                    volume: typeof point.volume === 'number' && Number.isFinite(point.volume)
+                        ? point.volume
+                        : null,
+                });
             }
-            return ok([...byTimestamp.values()].sort((a, b) => a.observedAt.getTime() - b.observedAt.getTime()));
+            return ok([...byTimestamp.values()].sort((a, b) => a.ts.getTime() - b.ts.getTime()));
         } catch (error) {
             logger.warn('history request failed', { symbol: normalized, error: String(error) });
             return errorResult('Der Kursverlauf konnte nicht von Yahoo Finance geladen werden.');

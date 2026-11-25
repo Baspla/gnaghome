@@ -57,14 +57,43 @@ describe('YahooFinanceMarketData', () => {
         expect(quote).toHaveBeenCalledTimes(3);
     });
 
-    it('maps and sorts historical closes while dropping null prices', async () => {
+    it('maps and sorts historical candles while dropping incomplete rows', async () => {
         const client = new YahooFinanceMarketData({
             quote: async () => quoteValue('AAPL', 100),
             chart: async () => ({
                 quotes: [
-                    { date: new Date('2026-01-01T12:30:00.000Z'), close: 101 },
-                    { date: new Date('2026-01-01T12:00:00.000Z'), close: 100 },
-                    { date: new Date('2026-01-01T12:15:00.000Z'), close: null },
+                    {
+                        date: new Date('2026-01-01T12:30:00.000Z'),
+                        open: 100.5,
+                        high: 102,
+                        low: 100,
+                        close: 101,
+                        volume: 2_000,
+                    },
+                    {
+                        date: new Date('2026-01-01T12:00:00.000Z'),
+                        open: 99,
+                        high: 101,
+                        low: 98,
+                        close: 100,
+                        volume: null,
+                    },
+                    {
+                        date: new Date('2026-01-01T12:15:00.000Z'),
+                        open: 100,
+                        high: 101,
+                        low: 99,
+                        close: null,
+                        volume: 500,
+                    },
+                    {
+                        date: new Date('2026-01-01T12:45:00.000Z'),
+                        open: null,
+                        high: 101,
+                        low: 99,
+                        close: 100,
+                        volume: 500,
+                    },
                 ],
             }),
         } as YahooFinanceLike);
@@ -76,13 +105,27 @@ describe('YahooFinanceMarketData', () => {
         expect(result).toMatchObject({
             ok: true,
             value: [
-                { observedAt: new Date('2026-01-01T12:00:00.000Z'), price: 100 },
-                { observedAt: new Date('2026-01-01T12:30:00.000Z'), price: 101 },
+                {
+                    ts: new Date('2026-01-01T12:00:00.000Z'),
+                    open: 99,
+                    high: 101,
+                    low: 98,
+                    close: 100,
+                    volume: null,
+                },
+                {
+                    ts: new Date('2026-01-01T12:30:00.000Z'),
+                    open: 100.5,
+                    high: 102,
+                    low: 100,
+                    close: 101,
+                    volume: 2_000,
+                },
             ],
         });
     });
 
-    it('forwards daily intervals for long-range history', async () => {
+    it('forwards hourly and daily intervals for history', async () => {
         const chart = mock(async (_symbol: string, _queryOptions?: Record<string, unknown>) => ({ quotes: [] }));
         const client = new YahooFinanceMarketData({
             quote: async () => quoteValue('AAPL', 100),
@@ -90,12 +133,22 @@ describe('YahooFinanceMarketData', () => {
         } as YahooFinanceLike);
 
         await client.fetchHistory('AAPL', {
+            from: new Date('2026-01-01T00:00:00.000Z'),
+            to: new Date('2026-01-02T00:00:00.000Z'),
+            interval: '1h',
+        });
+        await client.fetchHistory('AAPL', {
             from: new Date('2021-01-01T00:00:00.000Z'),
             to: new Date('2026-01-01T00:00:00.000Z'),
             interval: '1d',
         });
 
         expect(chart.mock.calls[0]?.[1]).toMatchObject({
+            interval: '1h',
+            period1: new Date('2026-01-01T00:00:00.000Z'),
+            period2: new Date('2026-01-02T00:00:00.000Z'),
+        });
+        expect(chart.mock.calls[1]?.[1]).toMatchObject({
             interval: '1d',
             period1: new Date('2021-01-01T00:00:00.000Z'),
             period2: new Date('2026-01-01T00:00:00.000Z'),

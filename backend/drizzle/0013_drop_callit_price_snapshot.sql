@@ -1,0 +1,1 @@
+DROP TABLE `callit_price_snapshot`;

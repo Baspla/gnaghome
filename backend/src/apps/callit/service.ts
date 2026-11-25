@@ -24,10 +24,10 @@ import type { ActivityFeedService } from '../../platform/activity-feed/service';
 import type { NotificationsService } from '../../platform/notifications/service';
 import type { ReactionsService } from '../../platform/reactions/service';
 import { user } from '../../platform/users/schema';
-import type { MarketDataClient, MarketQuote } from '../../integrations/yahoo-finance/client';
+import type { MarketCandle, MarketDataClient, MarketQuote } from '../../integrations/yahoo-finance/client';
 import {
     callItPrediction,
-    callItPriceSnapshot,
+    callItPriceCandle,
     callItSettings,
     callItTracker,
     type CallItPrediction,
@@ -56,9 +56,18 @@ const DURATION_DAYS: Record<CallItDurationKey, number> = {
     '1m': 30,
 };
 const SYMBOL_PATTERN = /^[A-Z0-9.^=-]{1,20}$/;
-const BACKFILL_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const CANDLE_INTERVALS = ['1h', '1d'] as const;
+const CANDLE_INTERVAL_MS: Record<CallItCandleInterval, number> = {
+    '1h': 60 * 60 * 1000,
+    '1d': DAY_MS,
+};
+const HOURLY_LOOKBACK_DAYS = 60;
+const DAILY_HISTORY_START = new Date('1970-01-01T00:00:00.000Z');
+const INTRADAY_HISTORY_DAYS = 7;
+const CANDLE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const CANDLE_CHUNK_SIZE = 100;
 export const CALL_IT_MAX_HISTORY_DAYS = 5 * 365;
-const BACKFILL_CHUNK_SIZE = 100;
 const MAX_COMPLETED_PREDICTIONS = 100;
 
 export type CallItUserSummary = { id: string; name: string; image: string | null };
@@ -285,6 +294,10 @@ function computeStats(predictions: StatsInput[]): CallItStats {
     };
 }
 
+function intervalForHistoryDays(days: number): CallItCandleInterval {
+    return days <= INTRADAY_HISTORY_DAYS ? '1h' : '1d';
+}
+
 function downsampleHistory(
     points: Array<{ observedAt: Date; price: number }>,
     maxPoints = MAX_HISTORY_POINTS,
@@ -326,6 +339,7 @@ export type CallItDirection = typeof CALL_IT_DIRECTIONS[number];
 export type CallItDurationKey = typeof CALL_IT_DURATIONS[number];
 export type CallItWager = typeof CALL_IT_WAGERS[number];
 export type CallItUpdateInterval = typeof CALL_IT_UPDATE_INTERVALS[number];
+export type CallItCandleInterval = typeof CANDLE_INTERVALS[number];
 
 export class CallItService {
     constructor(
@@ -339,7 +353,7 @@ export class CallItService {
         private readonly clock: () => Date = () => new Date(),
     ) {}
 
-    private readonly longHistoryBackfills = new Map<string, Promise<void>>();
+    private lastCandleRefreshAt: Date | null = null;
 
     private async ensureSettings() {
         const now = this.clock();
@@ -457,25 +471,24 @@ export class CallItService {
             if (trackers.length === 0) return ok([]);
 
             const now = this.clock();
-            if (historyDays > BACKFILL_DAYS) {
-                await Promise.all(trackers.map((tracker) => this.ensureLongHistory(tracker, now)));
-            }
-            const from = new Date(now.getTime() - historyDays * 24 * 60 * 60 * 1000);
+            const from = new Date(now.getTime() - historyDays * DAY_MS);
+            const interval = intervalForHistoryDays(historyDays);
             const historyRows = await this.db.select({
-                trackerId: callItPriceSnapshot.trackerId,
-                observedAt: callItPriceSnapshot.observedAt,
-                price: callItPriceSnapshot.price,
-            }).from(callItPriceSnapshot)
+                trackerId: callItPriceCandle.trackerId,
+                ts: callItPriceCandle.ts,
+                close: callItPriceCandle.close,
+            }).from(callItPriceCandle)
                 .where(and(
-                    inArray(callItPriceSnapshot.trackerId, trackers.map((tracker) => tracker.id)),
-                    gte(callItPriceSnapshot.observedAt, from),
+                    inArray(callItPriceCandle.trackerId, trackers.map((tracker) => tracker.id)),
+                    eq(callItPriceCandle.interval, interval),
+                    gte(callItPriceCandle.ts, from),
                 ))
-                .orderBy(asc(callItPriceSnapshot.observedAt));
+                .orderBy(asc(callItPriceCandle.ts));
 
             const historyByTracker = new Map<string, Array<{ observedAt: Date; price: number }>>();
             for (const row of historyRows) {
                 const points = historyByTracker.get(row.trackerId) ?? [];
-                points.push({ observedAt: row.observedAt, price: row.price });
+                points.push({ observedAt: row.ts, price: row.close });
                 historyByTracker.set(row.trackerId, points);
             }
 
@@ -506,82 +519,90 @@ export class CallItService {
         }
     }
 
-    private async insertSnapshots(
+    private async upsertCandles(
         trackerId: string,
-        points: Array<{ observedAt: Date; price: number }>,
-        currency: string | null,
-        source: 'sync' | 'backfill' | 'quote' | 'history',
-        fetchedAt: Date,
+        interval: CallItCandleInterval,
+        candles: MarketCandle[],
     ): Promise<void> {
-        for (const batch of chunks(points, BACKFILL_CHUNK_SIZE)) {
+        for (const batch of chunks(candles, CANDLE_CHUNK_SIZE)) {
             if (batch.length === 0) continue;
-            await this.db.insert(callItPriceSnapshot).values(batch.map((point) => ({
+            await this.db.insert(callItPriceCandle).values(batch.map((candle) => ({
                 trackerId,
-                observedAt: point.observedAt,
-                price: point.price,
-                currency,
-                source,
-                fetchedAt,
-            }))).onConflictDoNothing();
-        }
-    }
-
-    private async backfillTrackerHistory(trackerId: string, symbol: string, currency: string | null, now: Date): Promise<void> {
-        try {
-            const history = await this.marketData.fetchHistory(symbol, {
-                from: new Date(now.getTime() - BACKFILL_DAYS * 24 * 60 * 60 * 1000),
-                to: now,
-                interval: '15m',
+                interval,
+                ts: candle.ts,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+                volume: candle.volume,
+            }))).onConflictDoUpdate({
+                target: [callItPriceCandle.trackerId, callItPriceCandle.interval, callItPriceCandle.ts],
+                set: {
+                    open: sql`excluded.open`,
+                    high: sql`excluded.high`,
+                    low: sql`excluded.low`,
+                    close: sql`excluded.close`,
+                    volume: sql`excluded.volume`,
+                },
             });
-            if (!history.ok) {
-                logger.warn('tracker history backfill failed', { symbol, error: history.error.message });
-                return;
-            }
-            await this.insertSnapshots(trackerId, history.value, currency, 'backfill', now);
-        } catch (error) {
-            logger.warn('tracker history backfill failed', { symbol, error: String(error) });
         }
     }
 
-    private async backfillLongHistory(trackerId: string, symbol: string, currency: string | null, now: Date): Promise<void> {
-        try {
-            const history = await this.marketData.fetchHistory(symbol, {
-                from: new Date(now.getTime() - CALL_IT_MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000),
-                to: now,
-                interval: '1d',
-            });
-            if (!history.ok) {
-                logger.warn('tracker long history backfill failed', { symbol, error: history.error.message });
-                return;
+    private async refreshTrackerCandles(tracker: CallItTracker, now: Date): Promise<void> {
+        for (const interval of CANDLE_INTERVALS) {
+            try {
+                const [latest] = await this.db.select({ ts: callItPriceCandle.ts })
+                    .from(callItPriceCandle)
+                    .where(and(
+                        eq(callItPriceCandle.trackerId, tracker.id),
+                        eq(callItPriceCandle.interval, interval),
+                    ))
+                    .orderBy(desc(callItPriceCandle.ts))
+                    .limit(1);
+                const lookbackStart = interval === '1h'
+                    ? new Date(now.getTime() - HOURLY_LOOKBACK_DAYS * DAY_MS)
+                    : DAILY_HISTORY_START;
+                const from = latest
+                    ? new Date(Math.max(
+                        latest.ts.getTime() - CANDLE_INTERVAL_MS[interval],
+                        lookbackStart.getTime(),
+                    ))
+                    : lookbackStart;
+                if (from.getTime() >= now.getTime()) continue;
+
+                const history = await this.marketData.fetchHistory(tracker.symbol, {
+                    from,
+                    to: now,
+                    interval,
+                });
+                if (!history.ok) {
+                    logger.warn('tracker candle refresh failed', {
+                        symbol: tracker.symbol,
+                        interval,
+                        error: history.error.message,
+                    });
+                    continue;
+                }
+                await this.upsertCandles(tracker.id, interval, history.value);
+            } catch (error) {
+                logger.warn('tracker candle refresh failed', {
+                    symbol: tracker.symbol,
+                    interval,
+                    error: String(error),
+                });
             }
-            await this.insertSnapshots(trackerId, history.value, currency, 'history', now);
-        } catch (error) {
-            logger.warn('tracker long history backfill failed', { symbol, error: String(error) });
         }
     }
 
-    private async ensureLongHistory(tracker: CallItTracker, now: Date): Promise<void> {
-        const pending = this.longHistoryBackfills.get(tracker.id);
-        if (pending) return pending;
-
-        const task = (async () => {
-            const [existing] = await this.db.select({ trackerId: callItPriceSnapshot.trackerId })
-                .from(callItPriceSnapshot)
-                .where(and(
-                    eq(callItPriceSnapshot.trackerId, tracker.id),
-                    eq(callItPriceSnapshot.source, 'history'),
-                ))
-                .limit(1);
-            if (existing) return;
-            await this.backfillLongHistory(tracker.id, tracker.symbol, tracker.currency, now);
-        })().catch((error) => {
-            logger.warn('tracker long history check failed', { trackerId: tracker.id, error: String(error) });
-        }).finally(() => {
-            this.longHistoryBackfills.delete(tracker.id);
-        });
-
-        this.longHistoryBackfills.set(tracker.id, task);
-        return task;
+    private async refreshCandlesForTrackers(trackers: CallItTracker[], now: Date): Promise<void> {
+        if (this.lastCandleRefreshAt
+            && now.getTime() - this.lastCandleRefreshAt.getTime() < CANDLE_REFRESH_INTERVAL_MS) {
+            return;
+        }
+        this.lastCandleRefreshAt = now;
+        for (const tracker of trackers) {
+            await this.refreshTrackerCandles(tracker, now);
+        }
     }
 
     async addTracker(
@@ -605,9 +626,6 @@ export class CallItService {
         }
 
         const now = this.clock();
-        const snapshotAt = quote.marketState === null || quote.marketState === 'REGULAR'
-            ? now
-            : (quote.marketTime ?? now);
         const displayName = name || quote.name || symbol;
         const currency = quote.currency;
 
@@ -633,9 +651,7 @@ export class CallItService {
                     updatedAt: now,
                 }).where(eq(callItTracker.id, existing.id)).returning();
                 if (!updated) throw new Error('Tracker reactivation returned no row');
-                await this.insertSnapshots(updated.id, [{ observedAt: snapshotAt, price: quote.price }], currency, 'quote', now);
-                await this.backfillTrackerHistory(updated.id, updated.symbol, updated.currency, now);
-                await this.backfillLongHistory(updated.id, updated.symbol, updated.currency, now);
+                await this.refreshTrackerCandles(updated, now);
                 const counts = await this.activePredictionCounts();
                 await this.publishTrackerChanged(updated.id, 'CREATED');
                 return ok({
@@ -668,17 +684,8 @@ export class CallItService {
             };
             await this.db.transaction(async (tx) => {
                 await tx.insert(callItTracker).values(tracker);
-                await tx.insert(callItPriceSnapshot).values({
-                    trackerId,
-                    observedAt: snapshotAt,
-                    price: quote.price,
-                    currency,
-                    source: 'quote',
-                    fetchedAt: now,
-                }).onConflictDoNothing();
             });
-            await this.backfillTrackerHistory(trackerId, symbol, currency, now);
-            await this.ensureLongHistory(tracker, now);
+            await this.refreshTrackerCandles(tracker, now);
             await this.publishTrackerChanged(trackerId, 'CREATED');
             return ok({ tracker: { ...toTrackerSummary(tracker), activePredictionCount: 0 }, created: true });
         } catch (error) {
@@ -709,9 +716,9 @@ export class CallItService {
 
             const now = this.clock();
             const historyResult = await this.marketData.fetchHistory(normalized, {
-                from: new Date(now.getTime() - BACKFILL_DAYS * 24 * 60 * 60 * 1000),
+                from: new Date(now.getTime() - 30 * DAY_MS),
                 to: now,
-                interval: '15m',
+                interval: '1d',
             });
 
             return ok({
@@ -721,7 +728,12 @@ export class CallItService {
                 price: quote.price,
                 marketTime: quote.marketTime,
                 marketState: quote.marketState,
-                history: historyResult.ok ? downsampleHistory(historyResult.value, 120) : [],
+                history: historyResult.ok
+                    ? downsampleHistory(historyResult.value.map((point) => ({
+                        observedAt: point.ts,
+                        price: point.close,
+                    })), 120)
+                    : [],
                 existingTracker: existing ?? null,
             });
         } catch (error) {
@@ -880,8 +892,6 @@ export class CallItService {
         price: number;
         currency: string | null;
         fetched: boolean;
-        marketState: string | null;
-        marketTime: Date | null;
     }, CallItError>> {
         const maxAgeMs = Math.max(settings.updateIntervalMinutes * 2, 30) * 60 * 1000;
         if (tracker.lastPrice !== null
@@ -892,8 +902,6 @@ export class CallItService {
                 price: tracker.lastPrice,
                 currency: tracker.currency,
                 fetched: false,
-                marketState: null,
-                marketTime: tracker.lastPriceAt,
             });
         }
 
@@ -906,8 +914,6 @@ export class CallItService {
             price: quoteResult.value.price,
             currency: quoteResult.value.currency ?? tracker.currency,
             fetched: true,
-            marketState: quoteResult.value.marketState,
-            marketTime: quoteResult.value.marketTime,
         });
     }
 
@@ -988,17 +994,6 @@ export class CallItService {
                 }
                 await tx.insert(callItPrediction).values(prediction);
                 if (start.value.fetched) {
-                    const snapshotAt = start.value.marketState === null || start.value.marketState === 'REGULAR'
-                        ? now
-                        : (start.value.marketTime ?? now);
-                    await tx.insert(callItPriceSnapshot).values({
-                        trackerId: tracker.id,
-                        observedAt: snapshotAt,
-                        price: start.value.price,
-                        currency: start.value.currency,
-                        source: 'quote',
-                        fetchedAt: now,
-                    }).onConflictDoNothing();
                     await tx.update(callItTracker).set({
                         lastPrice: start.value.price,
                         lastPriceAt: now,
@@ -1228,19 +1223,18 @@ export class CallItService {
             if (!tracker) return err({ status: 404, code: 'NOT_FOUND', message: 'Tracker nicht gefunden.' });
 
             const now = this.clock();
-            if (historyDays > BACKFILL_DAYS) {
-                await this.ensureLongHistory(tracker, now);
-            }
-            const from = new Date(now.getTime() - historyDays * 24 * 60 * 60 * 1000);
+            const from = new Date(now.getTime() - historyDays * DAY_MS);
+            const interval = intervalForHistoryDays(historyDays);
             const historyRows = await this.db.select({
-                observedAt: callItPriceSnapshot.observedAt,
-                price: callItPriceSnapshot.price,
-            }).from(callItPriceSnapshot)
+                ts: callItPriceCandle.ts,
+                close: callItPriceCandle.close,
+            }).from(callItPriceCandle)
                 .where(and(
-                    eq(callItPriceSnapshot.trackerId, trackerId),
-                    gte(callItPriceSnapshot.observedAt, from),
+                    eq(callItPriceCandle.trackerId, trackerId),
+                    eq(callItPriceCandle.interval, interval),
+                    gte(callItPriceCandle.ts, from),
                 ))
-                .orderBy(asc(callItPriceSnapshot.observedAt));
+                .orderBy(asc(callItPriceCandle.ts));
 
             const activeRows = await this.db.select({
                 prediction: callItPrediction,
@@ -1283,7 +1277,10 @@ export class CallItService {
             return ok({
                 tracker: toTrackerSummary(tracker),
                 commentCount,
-                history: downsampleHistory(historyRows),
+                history: downsampleHistory(historyRows.map((row) => ({
+                    observedAt: row.ts,
+                    price: row.close,
+                }))),
                 activePredictions,
                 completedPredictions,
             });
@@ -1355,8 +1352,7 @@ export class CallItService {
                 }
 
                 try {
-                    const storeSnapshot = quote.marketState === null || quote.marketState === 'REGULAR';
-                    const resolved = await this.syncTracker(tracker, quote, now, storeSnapshot);
+                    const resolved = await this.syncTracker(tracker, quote, now);
                     trackersUpdated += 1;
                     predictionsResolved += resolved.length;
                     await this.publishTrackerChanged(tracker.id, 'UPDATED');
@@ -1370,6 +1366,8 @@ export class CallItService {
                     logger.error('tracker sync failed', { trackerId: tracker.id, symbol: tracker.symbol, error: String(error) });
                 }
             }
+
+            await this.refreshCandlesForTrackers(trackers, now);
 
             const errorMessage = errors.length > 0
                 ? errors.join('; ').slice(0, MAX_SYNC_ERROR_LENGTH)
@@ -1393,19 +1391,8 @@ export class CallItService {
         tracker: CallItTracker,
         quote: MarketQuote,
         now: Date,
-        storeSnapshot: boolean,
     ): Promise<Array<{ id: string; userId: string; direction: CallItDirection; profitLoss: number }>> {
         return this.db.transaction(async (tx) => {
-            if (storeSnapshot) {
-                await tx.insert(callItPriceSnapshot).values({
-                    trackerId: tracker.id,
-                    observedAt: now,
-                    price: quote.price,
-                    currency: quote.currency ?? tracker.currency,
-                    source: 'sync',
-                    fetchedAt: now,
-                }).onConflictDoNothing();
-            }
             await tx.update(callItTracker).set({
                 lastPrice: quote.price,
                 lastPriceAt: now,

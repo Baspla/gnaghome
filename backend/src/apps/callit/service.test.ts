@@ -9,14 +9,27 @@ import { ReactionsService } from '../../platform/reactions/service';
 import type { ActivityFeedService } from '../../platform/activity-feed/service';
 import type { NotificationsService } from '../../platform/notifications/service';
 import type {
+    MarketCandle,
     MarketDataClient,
-    MarketHistoryPoint,
     MarketQuote,
 } from '../../integrations/yahoo-finance/client';
 import { CallItService } from './service';
-import { callItPrediction, callItPriceSnapshot, callItTracker } from './schema';
+import { callItPrediction, callItPriceCandle, callItTracker } from './schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+function candle(ts: Date | string, close: number, overrides: Partial<MarketCandle> = {}): MarketCandle {
+    return {
+        ts: ts instanceof Date ? ts : new Date(ts),
+        open: close - 0.5,
+        high: close + 1,
+        low: close - 1,
+        close,
+        volume: 1_000,
+        ...overrides,
+    };
+}
 
 describe('CallItService', () => {
     let database: Awaited<ReturnType<typeof createDatabase>>;
@@ -29,8 +42,8 @@ describe('CallItService', () => {
     let notifyUsers: ReturnType<typeof mock>;
     let now: Date;
     let quotes: Map<string, MarketQuote>;
-    let history: Map<string, MarketHistoryPoint[]>;
-    let longHistory: Map<string, MarketHistoryPoint[]>;
+    let history: Map<string, MarketCandle[]>;
+    let longHistory: Map<string, MarketCandle[]>;
     let historyRequests: Array<{ symbol: string; from: Date; to: Date; interval?: string }>;
 
     const marketData: MarketDataClient = {
@@ -116,10 +129,10 @@ describe('CallItService', () => {
 
     afterEach(() => database.close());
 
-    it('adds a tracker with a discussion, initial price, and backfilled history', async () => {
-        history.set('AAPL', [
-            { observedAt: new Date('2025-12-31T23:30:00.000Z'), price: 99 },
-            { observedAt: new Date('2025-12-31T23:45:00.000Z'), price: 99.5 },
+    it('adds a tracker with a discussion, initial price, and backfilled candles', async () => {
+        longHistory.set('AAPL', [
+            candle('2025-12-30T14:30:00.000Z', 98),
+            candle('2025-12-31T14:30:00.000Z', 99),
         ]);
 
         const tracker = await addTracker('AAPL', 100);
@@ -135,13 +148,13 @@ describe('CallItService', () => {
         const detail = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 30 });
         expect(detail.ok).toBe(true);
         if (!detail.ok) return;
-        expect(detail.value.history.map((point) => point.price)).toEqual([99, 99.5, 100]);
+        expect(detail.value.history.map((point) => point.price)).toEqual([98, 99]);
         expect(detail.value.commentCount).toBe(0);
 
         const trackerOverview = await service.listActiveTrackersWithHistory(30);
         expect(trackerOverview.ok).toBe(true);
         if (trackerOverview.ok) {
-            expect(trackerOverview.value[0]?.history.map((point) => point.price)).toEqual([99, 99.5, 100]);
+            expect(trackerOverview.value[0]?.history.map((point) => point.price)).toEqual([98, 99]);
         }
 
         const duplicate = await service.addTracker('admin-1', { symbol: 'AAPL' });
@@ -157,52 +170,89 @@ describe('CallItService', () => {
         expect(reactivated.value.tracker.discussionId).toBe(tracker.discussionId);
     });
 
-    it('backfills five years of daily history and lazily fills it for existing trackers', async () => {
-        const tracker = await addTracker('AAPL', 100);
+    it('backfills hourly and daily candles and fills gaps with upserts', async () => {
+        const initialHourlyTs = new Date(now.getTime() - 2 * HOUR_MS);
+        const initialDailyTs = new Date(now.getTime() - DAY_MS);
+        history.set('AAPL', [candle(initialHourlyTs, 90)]);
+        longHistory.set('AAPL', [candle(initialDailyTs, 80)]);
+
+        await addTracker('AAPL', 100);
+        const hourlyRequests = () => historyRequests.filter((request) => request.interval === '1h');
         const dailyRequests = () => historyRequests.filter((request) => request.interval === '1d');
+        expect(hourlyRequests()).toHaveLength(1);
+        expect(hourlyRequests()[0]?.from.getTime()).toBe(now.getTime() - 60 * DAY_MS);
+        expect(hourlyRequests()[0]?.to.getTime()).toBe(now.getTime());
         expect(dailyRequests()).toHaveLength(1);
-        expect(dailyRequests()[0]?.from.getTime()).toBe(now.getTime() - 5 * 365 * DAY_MS);
+        expect(dailyRequests()[0]?.from.getTime()).toBe(new Date('1970-01-01T00:00:00.000Z').getTime());
         expect(dailyRequests()[0]?.to.getTime()).toBe(now.getTime());
 
-        longHistory.set('AAPL', [
-            { observedAt: new Date(now.getTime() - 4 * 365 * DAY_MS), price: 40 },
-            { observedAt: new Date(now.getTime() - 180 * DAY_MS), price: 80 },
-        ]);
-
-        await service.getTrackerDetail('user-1', tracker.id, { historyDays: 30 });
-        expect(dailyRequests()).toHaveLength(1);
-
-        const detail = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 365 });
+        now = new Date(now.getTime() + 3 * DAY_MS);
+        setQuote('AAPL', 100);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+        expect(hourlyRequests()).toHaveLength(2);
+        expect(hourlyRequests()[1]?.from.getTime()).toBe(initialHourlyTs.getTime() - HOUR_MS);
         expect(dailyRequests()).toHaveLength(2);
-        expect(detail.ok).toBe(true);
-        if (detail.ok) {
-            const prices = detail.value.history.map((point) => point.price);
-            expect(prices).toContain(80);
-            expect(prices).not.toContain(40);
-        }
+        expect(dailyRequests()[1]?.from.getTime()).toBe(initialDailyTs.getTime() - DAY_MS);
 
-        const longRows = (await database.db.select().from(callItPriceSnapshot))
-            .filter((row) => row.source === 'history');
-        expect(longRows.map((row) => row.price).sort((a, b) => a - b)).toEqual([40, 80]);
+        history.set('AAPL', [candle(initialHourlyTs, 95)]);
+        now = new Date(now.getTime() + 2 * HOUR_MS);
+        setQuote('AAPL', 100);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+        const hourlyRows = (await database.db.select().from(callItPriceCandle))
+            .filter((row) => row.interval === '1h' && row.ts.getTime() === initialHourlyTs.getTime());
+        expect(hourlyRows).toHaveLength(1);
+        expect(hourlyRows[0]?.close).toBe(95);
     });
 
-    it('refreshes long history when a removed tracker is reactivated', async () => {
+    it('refreshes candles at most once per hour during price syncs', async () => {
+        await addTracker('AAPL', 100);
+        const baseline = historyRequests.length;
+
+        setQuote('AAPL', 100);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+        expect(historyRequests.length).toBe(baseline + 2);
+
+        now = new Date(now.getTime() + 15 * 60 * 1000);
+        setQuote('AAPL', 101);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+        expect(historyRequests.length).toBe(baseline + 2);
+
+        now = new Date(now.getTime() + HOUR_MS);
+        setQuote('AAPL', 102);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+        expect(historyRequests.length).toBe(baseline + 4);
+    });
+
+    it('queries hourly candles for short ranges and daily candles for long ranges', async () => {
+        history.set('AAPL', [candle(new Date(now.getTime() - 2 * HOUR_MS), 111)]);
+        longHistory.set('AAPL', [candle(new Date(now.getTime() - 2 * DAY_MS), 222)]);
         const tracker = await addTracker('AAPL', 100);
-        const dailyRequestCount = () => historyRequests.filter((request) => request.interval === '1d').length;
-        expect(dailyRequestCount()).toBe(1);
+
+        const week = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 7 });
+        expect(week.ok && week.value.history.map((point) => point.price)).toEqual([111]);
+
+        const month = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 30 });
+        expect(month.ok && month.value.history.map((point) => point.price)).toEqual([222]);
+
+        const overview = await service.listActiveTrackersWithHistory(7);
+        expect(overview.ok && overview.value[0]?.history.map((point) => point.price)).toEqual([111]);
+    });
+
+    it('refreshes candles when a removed tracker is reactivated', async () => {
+        const tracker = await addTracker('AAPL', 100);
+        expect(historyRequests).toHaveLength(2);
 
         expect(await service.removeTracker(tracker.id)).toMatchObject({ ok: true, value: null });
-        longHistory.set('AAPL', [
-            { observedAt: new Date(now.getTime() - 3 * 365 * DAY_MS), price: 60 },
-        ]);
+        history.set('AAPL', [candle(new Date(now.getTime() - 2 * HOUR_MS), 61)]);
+        longHistory.set('AAPL', [candle(new Date(now.getTime() - 2 * DAY_MS), 60)]);
 
         expect(await service.addTracker('admin-1', { symbol: 'AAPL' }))
             .toMatchObject({ ok: true, value: { created: false, tracker: { isActive: true } } });
-        expect(dailyRequestCount()).toBe(2);
+        expect(historyRequests).toHaveLength(4);
 
-        const longRows = (await database.db.select().from(callItPriceSnapshot))
-            .filter((row) => row.source === 'history');
-        expect(longRows.map((row) => row.price)).toContain(60);
+        const rows = await database.db.select().from(callItPriceCandle);
+        expect(rows.filter((row) => row.interval === '1h').map((row) => row.close)).toContain(61);
+        expect(rows.filter((row) => row.interval === '1d').map((row) => row.close)).toContain(60);
     });
 
     it('validates prediction input, supports idempotent IDs, and enforces the active-prediction limit', async () => {
@@ -400,18 +450,20 @@ describe('CallItService', () => {
         });
     });
 
-    it('serves five years of tracker overview history on demand', async () => {
+    it('serves long-range daily candles for the tracker overview', async () => {
+        longHistory.set('AAPL', [
+            candle('2024-01-02T20:00:00.000Z', 80),
+            candle('2025-01-02T20:00:00.000Z', 90),
+        ]);
         const tracker = await addTracker('AAPL', 100);
         expect(tracker.id).toBeTruthy();
-        longHistory.set('AAPL', [
-            { observedAt: new Date('2024-01-02T20:00:00.000Z'), price: 80 },
-            { observedAt: new Date('2025-01-02T20:00:00.000Z'), price: 90 },
-        ]);
+        const requestsAfterAdd = historyRequests.length;
 
         const overview = await service.listActiveTrackersWithHistory(1825);
         expect(overview.ok).toBe(true);
         if (!overview.ok) return;
-        expect(overview.value[0]?.history.map((point) => point.price)).toEqual([80, 90, 100]);
+        expect(overview.value[0]?.history.map((point) => point.price)).toEqual([80, 90]);
+        expect(historyRequests).toHaveLength(requestsAfterAdd);
         expect(historyRequests.some((request) => request.symbol === 'AAPL' && request.interval === '1d')).toBe(true);
         expect(await service.listActiveTrackersWithHistory(1826))
             .toMatchObject({ ok: false, error: { status: 400 } });
@@ -488,9 +540,9 @@ describe('CallItService', () => {
 
     it('previews symbols with quote, history, and existing-tracker status without creating anything', async () => {
         setQuote('AAPL', 100);
-        history.set('AAPL', [
-            { observedAt: new Date('2025-12-31T23:30:00.000Z'), price: 99 },
-            { observedAt: new Date('2025-12-31T23:45:00.000Z'), price: 99.5 },
+        longHistory.set('AAPL', [
+            candle('2025-12-30T14:30:00.000Z', 99),
+            candle('2025-12-31T14:30:00.000Z', 99.5),
         ]);
 
         const preview = await service.previewTracker('aapl');
@@ -508,8 +560,9 @@ describe('CallItService', () => {
         if (preview.ok) {
             expect(preview.value.history.map((point) => point.price)).toEqual([99, 99.5]);
         }
+        expect(historyRequests[historyRequests.length - 1]?.interval).toBe('1d');
         expect(await database.db.select().from(callItTracker)).toHaveLength(0);
-        expect(await database.db.select().from(callItPriceSnapshot)).toHaveLength(0);
+        expect(await database.db.select().from(callItPriceCandle)).toHaveLength(0);
         expect(await database.db.select().from(discussion)).toHaveLength(0);
 
         const tracker = await addTracker('AAPL', 100);
@@ -542,7 +595,7 @@ describe('CallItService', () => {
 
         expect(await database.db.select().from(callItTracker)).toHaveLength(0);
         expect(await database.db.select().from(callItPrediction)).toHaveLength(0);
-        expect(await database.db.select().from(callItPriceSnapshot)).toHaveLength(0);
+        expect(await database.db.select().from(callItPriceCandle)).toHaveLength(0);
         expect(await database.db.select().from(reaction)).toHaveLength(0);
         expect(await database.db.select().from(discussion)).toHaveLength(0);
         expect(await database.db.select().from(discussionMessage)).toHaveLength(0);

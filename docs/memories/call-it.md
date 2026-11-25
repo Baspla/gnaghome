@@ -28,28 +28,28 @@ Wagers are virtual points displayed as euro (`€`). They do not touch a wallet 
 - Tracker removal is a soft removal. Removed trackers cannot be selected for new predictions, but trackers with active predictions continue to be synced until those predictions resolve. History and comments remain available.
 - Re-adding a removed symbol reactivates the existing tracker and reuses its discussion.
 - Admins can fully remove a tracker. Full removal permanently deletes the tracker, its price history, all its predictions, prediction reactions, and the tracker discussion/comments. This cannot be undone.
-- The admin UI requires a successful symbol preview before enabling the add action. Preview validates the symbol against Yahoo Finance and returns the resolved name, currency, current price, market state, 30-day history, and whether an active or removed tracker already exists for it; it persists nothing.
+- The admin UI requires a successful symbol preview before enabling the add action. Preview validates the symbol against Yahoo Finance and returns the resolved name, currency, current price, market state, 30-day daily candle history, and whether an active or removed tracker already exists for it; it persists nothing.
 
 ## Market data and price history
 
 - Provider: `yahoo-finance2` v4 in `backend/src/integrations/yahoo-finance/client.ts`.
 - The app depends on the `MarketDataClient` contract, not on Yahoo directly.
 - Batched sync uses `quote(symbols, { fields })`; v4 supports multiple symbols in one request.
-- Tracker validation and the 30-day backfill use `chart(symbol, { interval: '15m' })`; the long-range backfill uses `chart(symbol, { interval: '1d' })`.
-- Each tracker has persisted price history in `callit_price_snapshot` with a `(tracker_id, observed_at)` primary key and `source` of `sync`, `backfill`, `quote`, or `history`.
-- Scheduled snapshots are only appended while Yahoo reports `REGULAR` market state (or when the state is unknown). Closed, pre-market, and post-market syncs still update the tracker's current price and resolve due predictions, but do not append flat history points.
-- The chart additionally compacts long flat runs (more than two hours) and collapses non-trading time: points separated by more than two hours form separate trading sessions, every session gets an equal-width slot, and consecutive sessions join at their boundary, so nights, weekends, and holidays take no horizontal space. Points keep their relative time position inside a session. This keeps long ranges that mix daily and 15-minute points proportionally correct.
-- New trackers backfill the last 30 days of 15-minute closes and five years of daily closes on creation. The five-year daily series covers both the 1-year and 5-year views. Reactivating a tracker refreshes the five-year series so long removal gaps are filled. Backfill failure does not fail tracker creation; the scheduled sync fills future points, and long-range views retry the long backfill lazily.
-- Tracker pages read persisted history. If a range longer than 30 days is requested and the tracker has no `history`-source rows yet, the service fetches five years of daily closes once and persists them before returning; later reads use the cache. This also backfills trackers created before the long-range cache existed.
-- History is currently retained indefinitely. At 15-minute intervals this is about 35k rows per tracker per year; five years of daily closes add roughly 1.3k rows per tracker, acceptable for the SQLite deployment.
-- The tracker-detail API accepts ranges up to 1825 days and downsamples large ranges to at most 1000 chart points; the full snapshot history remains in SQLite. The tracker overview used by the main page accepts the same ranges and triggers the lazy long-history backfill when a range longer than 30 days is requested.
+- Historical data is stored as OHLCV candles in `callit_price_candle` with the primary key `(tracker_id, interval, ts)` and `open`, `high`, `low`, `close`, and nullable `volume`. Supported intervals are `1h` and `1d`.
+- Candle writes always upsert on `(tracker_id, interval, ts)` so the newest live/incomplete candle is updated instead of duplicated.
+- On creation and reactivation, a tracker backfills `1h` candles for the last 60 days and `1d` candles from Yahoo's full available history (`period1 = 1970-01-01`).
+- A throttled refresh runs from `callit.sync` at most once per hour. For each interval it starts at the newest stored candle minus one interval (or the full lookback when empty), which fills server-outage gaps. The first sync after startup therefore rebuilds the table after the old snapshot table was dropped.
+- Reads never mix intervals. Ranges up to 7 days query `interval = '1h'`; longer ranges query `interval = '1d'`. The API still returns `{ observedAt, price }` where `price` is the candle close, so the frontend chart contract is unchanged.
+- Tracker-detail ranges up to 1825 days and the main-page tracker overview use the same interval rule. Large results are downsampled to at most 1000 detail points and 120 overview points.
+- The chart compacts long flat runs (more than two hours) and collapses non-trading time: points separated by more than two hours form separate trading sessions, every session gets an equal-width slot, and consecutive sessions join at their boundary, so nights, weekends, and holidays take no horizontal space.
+- History is retained indefinitely. Hourly candles grow by roughly 1.5k rows per tracker per year; full daily history adds roughly 250 rows per year. This is acceptable for the SQLite deployment.
 - Prices and history are displayed in the tracker's Yahoo currency. Non-ISO Yahoo codes such as `GBp` fall back to `number + code` instead of being treated as GBP.
 - Wagers and profit/loss are always displayed as virtual EUR.
 
 ## Backend ownership
 
 - App: `backend/src/apps/callit/`
-  - `schema.ts`: trackers, price snapshots, predictions, settings.
+  - `schema.ts`: trackers, price candles, predictions, settings.
   - `service.ts`: tracker management, prediction creation, overview/user/tracker reads, price sync, resolution.
   - `module.ts`: authenticated `/api/v1/callit` routes and admin checks.
   - `tasks.ts`: `callit.sync` worker and `callit.price-sync` schedule.
