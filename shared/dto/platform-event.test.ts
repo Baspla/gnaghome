@@ -58,6 +58,7 @@ describe('PlatformEventSchema', () => {
             'callit.user-stats.changed',
             'callit.tracker.changed',
             'callit.settings.changed',
+            'callit.preferences.changed',
         ] as const;
         const actions = ['CREATED', 'UPDATED', 'DELETED'] as const;
 

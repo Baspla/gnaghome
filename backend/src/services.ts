@@ -12,6 +12,7 @@ import { createWebPushSender, type VapidConfig } from './platform/notifications/
 import { CustomEmojiService } from './platform/custom-emoji/service';
 import { ReactionsService } from './platform/reactions/service';
 import { CallItService } from './apps/callit/service';
+import { CallItPreferencesService } from './apps/callit/preferences';
 import { YahooFinanceMarketData } from './integrations/yahoo-finance/client';
 
 export function createServices(
@@ -51,6 +52,7 @@ export function createServices(
     crewnow = new CrewNowService(db, files, activityFeed, discussions, notifications, broadcast, reactions);
     const crewnowPreferences = new CrewNowPreferencesService(db, broadcast);
     const callit = new CallItService(db, new YahooFinanceMarketData(), discussions, activityFeed, notifications, broadcast, reactions);
+    const callitPreferences = new CallItPreferencesService(db, broadcast);
     discussions.setTargetOwnerResolver(async (targetType, targetId) =>
         targetType === 'crewnow.post' ? crewnow.getPostOwnerUserId(targetId) : null);
     discussions.setTargetUrlResolver(async (targetType, targetId) => {
@@ -65,5 +67,5 @@ export function createServices(
         }
     });
 
-    return { users, activityFeed, discussions, reactions, files, customEmoji, crewnow, crewnowPreferences, callit, tasks, notifications };
+    return { users, activityFeed, discussions, reactions, files, customEmoji, crewnow, crewnowPreferences, callit, callitPreferences, tasks, notifications };
 }

@@ -13,6 +13,7 @@ export type {
     CallItUserStatsChangedEvent,
     CallItTrackerChangedEvent,
     CallItSettingsChangedEvent,
+    CallItPreferencesChangedEvent,
     PlatformEventAction,
     PlatformEvent,
 } from './platform-event';

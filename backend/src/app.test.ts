@@ -88,6 +88,10 @@ function makeTestApp() {
                 captureDelaySeconds: preferences.captureDelaySeconds as 1 | 2 | 3 | 5,
             }),
         },
+        callItPreferencesService: {
+            getPreferences: async () => ok({ chartType: 'line' }),
+            updatePreferences: async (_userId, preferences) => ok({ chartType: preferences.chartType }),
+        },
         callitService: {
             getOverview: async () => ok({
                 myStats: {

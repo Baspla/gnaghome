@@ -77,7 +77,17 @@ export type CallItUserPage = {
     completedPredictions: CallItPrediction[];
 };
 
-export type CallItHistoryPoint = { observedAt: string; price: number };
+export type CallItHistoryPoint = {
+    observedAt: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+};
+
+export type CallItChartType = 'line' | 'candlestick';
+
+export type CallItPreferences = { chartType: CallItChartType };
 
 export type CallItTrackerOverviewItem = CallItTrackerListItem & { history: CallItHistoryPoint[] };
 

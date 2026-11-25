@@ -21,7 +21,7 @@ export const callItTracker = sqliteTable('callit_tracker', {
 
 export const callItPriceCandle = sqliteTable('callit_price_candle', {
     trackerId: text('tracker_id').notNull().references(() => callItTracker.id, { onDelete: 'cascade' }),
-    interval: text('interval', { enum: ['1h', '1d'] }).notNull(),
+    interval: text('interval', { enum: ['15m', '1h', '1d'] }).notNull(),
     ts: integer('ts', { mode: 'timestamp' }).notNull(),
     open: real('open').notNull(),
     high: real('high').notNull(),
@@ -30,6 +30,7 @@ export const callItPriceCandle = sqliteTable('callit_price_candle', {
     volume: integer('volume'),
 }, (table) => [
     primaryKey({ columns: [table.trackerId, table.interval, table.ts] }),
+    index('callit_price_candle_interval_ts_idx').on(table.interval, table.ts),
 ]);
 
 export const callItPrediction = sqliteTable('callit_prediction', {
@@ -54,6 +55,12 @@ export const callItPrediction = sqliteTable('callit_prediction', {
     index('callit_prediction_due_idx').on(table.status, table.endsAt),
 ]);
 
+export const callItPreference = sqliteTable('callit_preference', {
+    userId: text('user_id').primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+    chartType: text('chart_type', { enum: ['line', 'candlestick'] }).notNull().default('line'),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const callItSettings = sqliteTable('callit_settings', {
     id: text('id').primaryKey(),
     updateIntervalMinutes: integer('update_interval_minutes').notNull().default(15),
@@ -67,4 +74,5 @@ export const callItSettings = sqliteTable('callit_settings', {
 export type CallItTracker = typeof callItTracker.$inferSelect;
 export type CallItPriceCandle = typeof callItPriceCandle.$inferSelect;
 export type CallItPrediction = typeof callItPrediction.$inferSelect;
+export type CallItPreference = typeof callItPreference.$inferSelect;
 export type CallItSettings = typeof callItSettings.$inferSelect;

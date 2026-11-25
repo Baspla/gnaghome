@@ -35,6 +35,7 @@ const {
     crewnow: crewNowService,
     crewnowPreferences: crewNowPreferencesService,
     callit: callItService,
+    callitPreferences: callItPreferencesService,
     tasks: tasksService,
     notifications: notificationsService,
     reactions: reactionsService,
@@ -99,6 +100,7 @@ const app = createApp({
     crewNowService,
     crewNowPreferencesService,
     callitService: callItService,
+    callItPreferencesService: callItPreferencesService,
     rescheduleCallItSync: async (minutes) => {
         const result = await scheduleCallItSync(tasksService, minutes);
         if (!result.ok) throw new Error(result.error.message);

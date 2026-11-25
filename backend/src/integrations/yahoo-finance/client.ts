@@ -35,7 +35,7 @@ export type MarketCandle = {
 export type MarketHistoryOptions = {
     from: Date;
     to: Date;
-    interval?: '1h' | '1d';
+    interval?: '15m' | '1h' | '1d';
 };
 
 export interface MarketDataClient {

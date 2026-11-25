@@ -1,0 +1,1 @@
+CREATE INDEX `callit_price_candle_interval_ts_idx` ON `callit_price_candle` (`interval`,`ts`);

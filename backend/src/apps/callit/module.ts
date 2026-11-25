@@ -2,9 +2,11 @@ import { Elysia, t } from 'elysia';
 import { Modules } from '$shared/constants';
 import type { createAuthMiddleware } from '../../platform/auth';
 import { createLogger } from '../../lib/logger';
+import type { CallItPreferencesService } from './preferences';
 import {
     CALL_IT_MAX_HISTORY_DAYS,
     type CallItOverview,
+    type CallItHistoryPoint,
     type CallItPredictionSummary,
     type CallItService,
     type CallItSettingsView,
@@ -37,6 +39,8 @@ type Service = Pick<
 
 type RescheduleSync = (minutes: number) => Promise<void>;
 
+type PreferencesService = Pick<CallItPreferencesService, 'getPreferences' | 'updatePreferences'>;
+
 function serializeTracker(tracker: CallItTrackerSummary) {
     return {
         ...tracker,
@@ -51,10 +55,13 @@ function serializeTrackerListItem(tracker: CallItTrackerListItem) {
     };
 }
 
-function serializeTrackerHistory(points: Array<{ observedAt: Date; price: number }>) {
+function serializeTrackerHistory(points: CallItHistoryPoint[]) {
     return points.map((point) => ({
         observedAt: point.observedAt.toISOString(),
-        price: point.price,
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
     }));
 }
 
@@ -104,10 +111,7 @@ function serializeTrackerDetail(detail: CallItTrackerDetail) {
     return {
         ...detail,
         tracker: serializeTracker(detail.tracker),
-        history: detail.history.map((point) => ({
-            observedAt: point.observedAt.toISOString(),
-            price: point.price,
-        })),
+        history: serializeTrackerHistory(detail.history),
         activePredictions: detail.activePredictions.map(serializePrediction),
         completedPredictions: detail.completedPredictions.map(serializePrediction),
     };
@@ -147,10 +151,26 @@ const intervalSchema = t.Union([
 export function createCallItModule(
     authMiddleware: ReturnType<typeof createAuthMiddleware>,
     service: Service,
+    preferencesService: PreferencesService,
     rescheduleSync: RescheduleSync,
 ) {
     return new Elysia({ prefix: '/callit', name: Modules.CALL_IT })
         .use(authMiddleware)
+        .get('/preferences', async ({ user, status }) => {
+            const result = await preferencesService.getPreferences(user.id);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return result.value;
+        }, { auth: true })
+        .put('/preferences', async ({ user, body, status }) => {
+            const result = await preferencesService.updatePreferences(user.id, body);
+            if (!result.ok) return status(result.error.status, { error: result.error });
+            return result.value;
+        }, {
+            body: t.Object({
+                chartType: t.Union([t.Literal('line'), t.Literal('candlestick')]),
+            }),
+            auth: true,
+        })
         .get('/overview', async ({ user, status }) => {
             const result = await service.getOverview(user.id);
             if (!result.ok) return status(result.error.status, { error: result.error });

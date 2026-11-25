@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import type { AppDatabase } from '../../db/connection';
 import { createLogger } from '../../lib/logger';
 import {
@@ -57,15 +57,24 @@ const DURATION_DAYS: Record<CallItDurationKey, number> = {
 };
 const SYMBOL_PATTERN = /^[A-Z0-9.^=-]{1,20}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const CANDLE_INTERVALS = ['1h', '1d'] as const;
+const CANDLE_INTERVALS = ['15m', '1h', '1d'] as const;
 const CANDLE_INTERVAL_MS: Record<CallItCandleInterval, number> = {
+    '15m': 15 * 60 * 1000,
     '1h': 60 * 60 * 1000,
     '1d': DAY_MS,
 };
+const FIFTEEN_MINUTE_LOOKBACK_DAYS = 30;
 const HOURLY_LOOKBACK_DAYS = 60;
 const DAILY_HISTORY_START = new Date('1970-01-01T00:00:00.000Z');
 const INTRADAY_HISTORY_DAYS = 7;
-const CANDLE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const CANDLE_REFRESH_INTERVALS_MS: Record<CallItCandleInterval, number> = {
+    '15m': 15 * 60 * 1000,
+    '1h': 60 * 60 * 1000,
+    '1d': 60 * 60 * 1000,
+};
+const CANDLE_CLEANUP_INTERVAL_MS = DAY_MS;
+const FIFTEEN_MINUTE_RETENTION_DAYS = 30;
+const HOURLY_RETENTION_DAYS = 60;
 const CANDLE_CHUNK_SIZE = 100;
 export const CALL_IT_MAX_HISTORY_DAYS = 5 * 365;
 const MAX_COMPLETED_PREDICTIONS = 100;
@@ -84,8 +93,15 @@ export type CallItTrackerSummary = {
 };
 
 export type CallItTrackerListItem = CallItTrackerSummary & { activePredictionCount: number };
+export type CallItHistoryPoint = {
+    observedAt: Date;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+};
 export type CallItTrackerOverviewItem = CallItTrackerListItem & {
-    history: Array<{ observedAt: Date; price: number }>;
+    history: CallItHistoryPoint[];
 };
 
 export type CallItTrackerPreview = {
@@ -95,7 +111,7 @@ export type CallItTrackerPreview = {
     price: number;
     marketTime: Date | null;
     marketState: string | null;
-    history: Array<{ observedAt: Date; price: number }>;
+    history: CallItHistoryPoint[];
     existingTracker: { id: string; isActive: boolean } | null;
 };
 
@@ -163,7 +179,7 @@ export type CallItUserPage = {
 export type CallItTrackerDetail = {
     tracker: CallItTrackerSummary;
     commentCount: number;
-    history: Array<{ observedAt: Date; price: number }>;
+    history: CallItHistoryPoint[];
     activePredictions: CallItPredictionSummary[];
     completedPredictions: CallItPredictionSummary[];
 };
@@ -295,16 +311,17 @@ function computeStats(predictions: StatsInput[]): CallItStats {
 }
 
 function intervalForHistoryDays(days: number): CallItCandleInterval {
+    if (days <= 1) return '15m';
     return days <= INTRADAY_HISTORY_DAYS ? '1h' : '1d';
 }
 
 function downsampleHistory(
-    points: Array<{ observedAt: Date; price: number }>,
+    points: CallItHistoryPoint[],
     maxPoints = MAX_HISTORY_POINTS,
-): Array<{ observedAt: Date; price: number }> {
+): CallItHistoryPoint[] {
     if (points.length <= maxPoints) return points;
     const step = (points.length - 1) / (maxPoints - 1);
-    const sampled: Array<{ observedAt: Date; price: number }> = [];
+    const sampled: CallItHistoryPoint[] = [];
     for (let index = 0; index < maxPoints; index += 1) {
         sampled.push(points[Math.round(index * step)]!);
     }
@@ -353,7 +370,8 @@ export class CallItService {
         private readonly clock: () => Date = () => new Date(),
     ) {}
 
-    private lastCandleRefreshAt: Date | null = null;
+    private readonly lastCandleRefreshAt = new Map<CallItCandleInterval, Date>();
+    private lastCandleCleanupAt: Date | null = null;
 
     private async ensureSettings() {
         const now = this.clock();
@@ -476,6 +494,9 @@ export class CallItService {
             const historyRows = await this.db.select({
                 trackerId: callItPriceCandle.trackerId,
                 ts: callItPriceCandle.ts,
+                open: callItPriceCandle.open,
+                high: callItPriceCandle.high,
+                low: callItPriceCandle.low,
                 close: callItPriceCandle.close,
             }).from(callItPriceCandle)
                 .where(and(
@@ -485,10 +506,16 @@ export class CallItService {
                 ))
                 .orderBy(asc(callItPriceCandle.ts));
 
-            const historyByTracker = new Map<string, Array<{ observedAt: Date; price: number }>>();
+            const historyByTracker = new Map<string, CallItHistoryPoint[]>();
             for (const row of historyRows) {
                 const points = historyByTracker.get(row.trackerId) ?? [];
-                points.push({ observedAt: row.ts, price: row.close });
+                points.push({
+                    observedAt: row.ts,
+                    open: row.open,
+                    high: row.high,
+                    low: row.low,
+                    close: row.close,
+                });
                 historyByTracker.set(row.trackerId, points);
             }
 
@@ -548,8 +575,12 @@ export class CallItService {
         }
     }
 
-    private async refreshTrackerCandles(tracker: CallItTracker, now: Date): Promise<void> {
-        for (const interval of CANDLE_INTERVALS) {
+    private async refreshTrackerCandles(
+        tracker: CallItTracker,
+        now: Date,
+        intervals: readonly CallItCandleInterval[] = CANDLE_INTERVALS,
+    ): Promise<void> {
+        for (const interval of intervals) {
             try {
                 const [latest] = await this.db.select({ ts: callItPriceCandle.ts })
                     .from(callItPriceCandle)
@@ -559,9 +590,11 @@ export class CallItService {
                     ))
                     .orderBy(desc(callItPriceCandle.ts))
                     .limit(1);
-                const lookbackStart = interval === '1h'
-                    ? new Date(now.getTime() - HOURLY_LOOKBACK_DAYS * DAY_MS)
-                    : DAILY_HISTORY_START;
+                const lookbackStart = interval === '15m'
+                    ? new Date(now.getTime() - FIFTEEN_MINUTE_LOOKBACK_DAYS * DAY_MS)
+                    : interval === '1h'
+                        ? new Date(now.getTime() - HOURLY_LOOKBACK_DAYS * DAY_MS)
+                        : DAILY_HISTORY_START;
                 const from = latest
                     ? new Date(Math.max(
                         latest.ts.getTime() - CANDLE_INTERVAL_MS[interval],
@@ -594,14 +627,42 @@ export class CallItService {
         }
     }
 
+    private dueCandleIntervals(now: Date): CallItCandleInterval[] {
+        return CANDLE_INTERVALS.filter((interval) => {
+            const lastRefresh = this.lastCandleRefreshAt.get(interval);
+            return !lastRefresh
+                || now.getTime() - lastRefresh.getTime() >= CANDLE_REFRESH_INTERVALS_MS[interval];
+        });
+    }
+
     private async refreshCandlesForTrackers(trackers: CallItTracker[], now: Date): Promise<void> {
-        if (this.lastCandleRefreshAt
-            && now.getTime() - this.lastCandleRefreshAt.getTime() < CANDLE_REFRESH_INTERVAL_MS) {
+        const intervals = this.dueCandleIntervals(now);
+        if (intervals.length === 0) return;
+        for (const interval of intervals) {
+            this.lastCandleRefreshAt.set(interval, now);
+        }
+        for (const tracker of trackers) {
+            await this.refreshTrackerCandles(tracker, now, intervals);
+        }
+    }
+
+    private async cleanupOldCandles(now: Date): Promise<void> {
+        if (this.lastCandleCleanupAt
+            && now.getTime() - this.lastCandleCleanupAt.getTime() < CANDLE_CLEANUP_INTERVAL_MS) {
             return;
         }
-        this.lastCandleRefreshAt = now;
-        for (const tracker of trackers) {
-            await this.refreshTrackerCandles(tracker, now);
+        this.lastCandleCleanupAt = now;
+        try {
+            await this.db.delete(callItPriceCandle).where(and(
+                eq(callItPriceCandle.interval, '15m'),
+                lt(callItPriceCandle.ts, new Date(now.getTime() - FIFTEEN_MINUTE_RETENTION_DAYS * DAY_MS)),
+            ));
+            await this.db.delete(callItPriceCandle).where(and(
+                eq(callItPriceCandle.interval, '1h'),
+                lt(callItPriceCandle.ts, new Date(now.getTime() - HOURLY_RETENTION_DAYS * DAY_MS)),
+            ));
+        } catch (error) {
+            logger.warn('callit candle cleanup failed', { error: String(error) });
         }
     }
 
@@ -731,7 +792,10 @@ export class CallItService {
                 history: historyResult.ok
                     ? downsampleHistory(historyResult.value.map((point) => ({
                         observedAt: point.ts,
-                        price: point.close,
+                        open: point.open,
+                        high: point.high,
+                        low: point.low,
+                        close: point.close,
                     })), 120)
                     : [],
                 existingTracker: existing ?? null,
@@ -1227,6 +1291,9 @@ export class CallItService {
             const interval = intervalForHistoryDays(historyDays);
             const historyRows = await this.db.select({
                 ts: callItPriceCandle.ts,
+                open: callItPriceCandle.open,
+                high: callItPriceCandle.high,
+                low: callItPriceCandle.low,
                 close: callItPriceCandle.close,
             }).from(callItPriceCandle)
                 .where(and(
@@ -1279,7 +1346,10 @@ export class CallItService {
                 commentCount,
                 history: downsampleHistory(historyRows.map((row) => ({
                     observedAt: row.ts,
-                    price: row.close,
+                    open: row.open,
+                    high: row.high,
+                    low: row.low,
+                    close: row.close,
                 }))),
                 activePredictions,
                 completedPredictions,
@@ -1320,6 +1390,7 @@ export class CallItService {
 
         try {
             const settings = await this.ensureSettings();
+            await this.cleanupOldCandles(now);
             const allTrackers = await this.db.select().from(callItTracker);
             const activeTrackerRows = await this.db.selectDistinct({ trackerId: callItPrediction.trackerId })
                 .from(callItPrediction)
@@ -1344,6 +1415,10 @@ export class CallItService {
             }
 
             const quotes = new Map(quotesResult.value.map((quote) => [quote.symbol, quote]));
+            const syncedTrackers: Array<{
+                tracker: CallItTracker;
+                resolved: Array<{ id: string; userId: string; direction: CallItDirection; profitLoss: number }>;
+            }> = [];
             for (const tracker of trackers) {
                 const quote: MarketQuote | undefined = quotes.get(tracker.symbol);
                 if (!quote) {
@@ -1355,19 +1430,24 @@ export class CallItService {
                     const resolved = await this.syncTracker(tracker, quote, now);
                     trackersUpdated += 1;
                     predictionsResolved += resolved.length;
-                    await this.publishTrackerChanged(tracker.id, 'UPDATED');
-                    for (const prediction of resolved) {
-                        await this.publishPredictionChanged(prediction.id, 'UPDATED');
-                        await this.publishUserStatsChanged(prediction.userId);
-                    }
-                    await this.announceResolvedPredictions(tracker, resolved, now);
+                    syncedTrackers.push({ tracker, resolved });
                 } catch (error) {
                     errors.push(`${tracker.symbol}: Synchronisierung fehlgeschlagen`);
                     logger.error('tracker sync failed', { trackerId: tracker.id, symbol: tracker.symbol, error: String(error) });
                 }
             }
 
+            // Refresh candles before announcing tracker changes so clients refetch fresh history.
             await this.refreshCandlesForTrackers(trackers, now);
+
+            for (const { tracker, resolved } of syncedTrackers) {
+                await this.publishTrackerChanged(tracker.id, 'UPDATED');
+                for (const prediction of resolved) {
+                    await this.publishPredictionChanged(prediction.id, 'UPDATED');
+                    await this.publishUserStatsChanged(prediction.userId);
+                }
+                await this.announceResolvedPredictions(tracker, resolved, now);
+            }
 
             const errorMessage = errors.length > 0
                 ? errors.join('; ').slice(0, MAX_SYNC_ERROR_LENGTH)

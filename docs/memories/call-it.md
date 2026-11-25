@@ -35,22 +35,23 @@ Wagers are virtual points displayed as euro (`€`). They do not touch a wallet 
 - Provider: `yahoo-finance2` v4 in `backend/src/integrations/yahoo-finance/client.ts`.
 - The app depends on the `MarketDataClient` contract, not on Yahoo directly.
 - Batched sync uses `quote(symbols, { fields })`; v4 supports multiple symbols in one request.
-- Historical data is stored as OHLCV candles in `callit_price_candle` with the primary key `(tracker_id, interval, ts)` and `open`, `high`, `low`, `close`, and nullable `volume`. Supported intervals are `1h` and `1d`.
+- Historical data is stored as OHLCV candles in `callit_price_candle` with the primary key `(tracker_id, interval, ts)` and `open`, `high`, `low`, `close`, and nullable `volume`. Supported intervals are `15m`, `1h`, and `1d`.
 - Candle writes always upsert on `(tracker_id, interval, ts)` so the newest live/incomplete candle is updated instead of duplicated.
-- On creation and reactivation, a tracker backfills `1h` candles for the last 60 days and `1d` candles from Yahoo's full available history (`period1 = 1970-01-01`).
-- A throttled refresh runs from `callit.sync` at most once per hour. For each interval it starts at the newest stored candle minus one interval (or the full lookback when empty), which fills server-outage gaps. The first sync after startup therefore rebuilds the table after the old snapshot table was dropped.
-- Reads never mix intervals. Ranges up to 7 days query `interval = '1h'`; longer ranges query `interval = '1d'`. The API still returns `{ observedAt, price }` where `price` is the candle close, so the frontend chart contract is unchanged.
+- On creation and reactivation, a tracker backfills `15m` candles for the last 30 days, `1h` candles for the last 60 days, and `1d` candles from Yahoo's full available history (`period1 = 1970-01-01`).
+- `callit.sync` refreshes each interval on its own cadence: `15m` when at least 15 minutes have elapsed, and `1h`/`1d` when at least an hour has elapsed. Candle refreshes run before tracker change events so clients refetch fresh history. The first sync after startup refreshes all intervals.
+- Reads use one interval per response. A 1-day range queries `interval = '15m'`; ranges up to 7 days query `interval = '1h'`; longer ranges query `interval = '1d'`. The API returns each history point as `{ observedAt, open, high, low, close }`. Line charts plot `close`; candlestick charts use the full OHLC range.
 - Tracker-detail ranges up to 1825 days and the main-page tracker overview use the same interval rule. Large results are downsampled to at most 1000 detail points and 120 overview points.
-- The chart compacts long flat runs (more than two hours) and collapses non-trading time: points separated by more than two hours form separate trading sessions, every session gets an equal-width slot, and consecutive sessions join at their boundary, so nights, weekends, and holidays take no horizontal space.
-- History is retained indefinitely. Hourly candles grow by roughly 1.5k rows per tracker per year; full daily history adds roughly 250 rows per year. This is acceptable for the SQLite deployment.
+- Both chart types share the same history payload and preparation pipeline. Long flat runs (identical OHLC values for more than two hours) are compacted, non-trading time is collapsed: points separated by more than two hours form separate trading sessions, every session gets an equal-width slot, consecutive sessions join at their boundary, so nights, weekends, and holidays take no horizontal space. At most 500 points are rendered per chart. Candlesticks use a candle-specific x layout that insets every session by half a candle slot, so the last candle of a session and the first candle of the next never overlap; a minimum body height keeps doji and tiny bodies visible.
+- Retention matches provider availability: `15m` candles are pruned after 30 days, `1h` after 60 days, and `1d` is retained indefinitely. Cleanup runs at most once per day during `callit.sync` using the `(interval, ts)` index. Yahoo limits `15m` history to roughly 60 days and `1h` to roughly 730 days; older periods therefore use the retained daily candles.
 - Prices and history are displayed in the tracker's Yahoo currency. Non-ISO Yahoo codes such as `GBp` fall back to `number + code` instead of being treated as GBP.
 - Wagers and profit/loss are always displayed as virtual EUR.
 
 ## Backend ownership
 
 - App: `backend/src/apps/callit/`
-  - `schema.ts`: trackers, price candles, predictions, settings.
+  - `schema.ts`: trackers, price candles, predictions, per-user preferences, settings.
   - `service.ts`: tracker management, prediction creation, overview/user/tracker reads, price sync, resolution.
+  - `preferences.ts`: per-user chart-type preference (line or candlestick).
   - `module.ts`: authenticated `/api/v1/callit` routes and admin checks.
   - `tasks.ts`: `callit.sync` worker and `callit.price-sync` schedule.
 - Integration: `backend/src/integrations/yahoo-finance/` owns provider calls and response mapping.
@@ -84,19 +85,28 @@ Creation notifications include the player name, tracker, direction, and wager an
 - `max_active_predictions_per_user` (default 6; allowed 1–50)
 - `last_sync_at`, `last_sync_error`
 
+Per-user display preferences are stored in `callit_preference`:
+- `user_id` (primary key, cascades with the user)
+- `chart_type` (`line` or `candlestick`, default `line`)
+- `updated_at`
+
+`GET /callit/preferences` returns the signed-in user's preference and `PUT /callit/preferences` updates it. The preference applies to all Call it price charts, including overview cards, the prediction form preview, tracker detail, and the admin preview.
+
 The task schedule uses five-field UTC cron:
 - `*/5`, `*/10`, `*/15`, `*/20`, `*/30`, or `0 * * * *` for 60 minutes.
 - On startup the persisted interval is read, the schedule is upserted, and one immediate sync is queued.
 - Admin interval changes reschedule the task immediately.
+- The 1-day chart updates at the sync cadence, but 15-minute candles are refreshed at most every 15 minutes.
 
 ## Realtime events
 
-All events are thin and published on `public`:
+All events are thin. Prediction, user-stat, tracker, and settings events are published on `public`; the per-user chart preference is published on `user:<userId>`:
 
 - `callit.prediction.changed` — `entityId` = prediction ID
 - `callit.user-stats.changed` — `entityId` = user ID
 - `callit.tracker.changed` — `entityId` = tracker ID
 - `callit.settings.changed` — `entityId` = `callit-settings`
+- `callit.preferences.changed` — `entityId` = `callit-preferences`, private to the owning user
 
 Frontend pages match the relevant ID, refetch persisted state, and also refetch on reconnect.
 
@@ -107,6 +117,7 @@ Frontend pages match the relevant ID, refetch persisted state, and also refetch 
 - `/callit/users/[id]` — active and completed predictions (paginated) plus stats including the current open value.
 - `/callit/create` — tracker/direction/duration/wager form, including the active-prediction limit, a shared time-range selector (default 30 days) and price chart for the selected tracker, and direction buttons with up/down arrow icons.
 - `/callit/trackers/[id]` — tracker price history with the shared 1-day/7-day/30-day/90-day/1-year/5-year range selector, paginated active/completed predictions, and the shared comments panel. Charts show top, bottom, and current price labels on the right edge.
+- Price charts use `PriceHistoryChart`, which selects `LinePriceChart` or `CandlestickPriceChart` based on the signed-in user's preference. Both variants receive the same OHLC history array; the line chart plots closes and the candlestick chart renders open/high/low/close candles. The 1-day range uses 15-minute candles, the 7-day range uses hourly candles, and longer ranges use daily candles. Candlesticks use a candle-specific x layout so session boundaries do not overlay candles, and a minimum body height keeps tiny/doji bodies visible. The preference is editable in the settings dialog's "Präferenzen" tab and updates charts immediately.
 - Every prediction card shows a direction badge with an up or down arrow.
 - Profile page: `CallItStatsCard` shows active wager count/total, all-time profit, current open value, and a link to the per-user page. It refreshes on user-stat, tracker-price, and reconnect events.
 - Admin settings: `CallItAdminSettings` in the user settings dialog, visible only for admins. Adding a tracker requires a successful preview for the current symbol (quote, market state, 30-day chart, and existing-tracker status), and each tracker row offers a soft "Entfernen" plus a destructive "Vollständig entfernen" action.

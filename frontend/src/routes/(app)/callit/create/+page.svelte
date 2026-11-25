@@ -135,7 +135,7 @@
                 throw new Error(typeof message === 'string' ? message : 'Die Vorhersage konnte nicht erstellt werden.');
             }
             toaster.success({ title: 'Vorhersage platziert', description: `${selectedTracker.symbol} · ${durationLabel(durationKey)}` });
-            await goto(`/callit/users/${encodeURIComponent(currentUserId)}`);
+            await goto(`/callit`);
         } catch (error) {
             errorMessage = error instanceof Error ? error.message : 'Die Vorhersage konnte nicht erstellt werden.';
         } finally {

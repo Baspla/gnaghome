@@ -19,6 +19,7 @@
     import { Popover } from '@skeletonlabs/skeleton-svelte';
     import NotificationSettings from "./NotificationSettings.svelte";
     import CrewNowPreferences from "./CrewNowPreferences.svelte";
+    import CallItPreferences from "$lib/components/callit/CallItPreferences.svelte";
     import CallItAdminSettings from "$lib/components/callit/CallItAdminSettings.svelte";
     import { getCustomEmojis, refreshCustomEmojis } from "$lib/custom-emoji-catalog.svelte";
 
@@ -360,7 +361,10 @@
         {:else if activeSection === "notifications"}
             <NotificationSettings />
         {:else if activeSection === "preferences"}
-            <CrewNowPreferences />
+            <div class="flex flex-col gap-8">
+                <CrewNowPreferences />
+                <CallItPreferences />
+            </div>
         {:else if activeSection === "callit"}
             <CallItAdminSettings />
         {:else if activeSection === "custom-emojis"}

@@ -42,6 +42,7 @@ describe('CallItService', () => {
     let notifyUsers: ReturnType<typeof mock>;
     let now: Date;
     let quotes: Map<string, MarketQuote>;
+    let fifteenMinuteHistory: Map<string, MarketCandle[]>;
     let history: Map<string, MarketCandle[]>;
     let longHistory: Map<string, MarketCandle[]>;
     let historyRequests: Array<{ symbol: string; from: Date; to: Date; interval?: string }>;
@@ -59,7 +60,11 @@ describe('CallItService', () => {
                 to: options.to,
                 interval: options.interval,
             });
-            const source = options.interval === '1d' ? longHistory : history;
+            const source = options.interval === '1d'
+                ? longHistory
+                : options.interval === '15m'
+                    ? fifteenMinuteHistory
+                    : history;
             return ok(source.get(symbol) ?? []);
         },
     };
@@ -100,6 +105,7 @@ describe('CallItService', () => {
         database = await createDatabase(':memory:');
         now = new Date('2026-01-01T00:00:00.000Z');
         quotes = new Map();
+        fifteenMinuteHistory = new Map();
         history = new Map();
         longHistory = new Map();
         historyRequests = [];
@@ -148,13 +154,14 @@ describe('CallItService', () => {
         const detail = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 30 });
         expect(detail.ok).toBe(true);
         if (!detail.ok) return;
-        expect(detail.value.history.map((point) => point.price)).toEqual([98, 99]);
+        expect(detail.value.history.map((point) => point.close)).toEqual([98, 99]);
+        expect(detail.value.history[0]).toMatchObject({ open: 97.5, high: 99, low: 97, close: 98 });
         expect(detail.value.commentCount).toBe(0);
 
         const trackerOverview = await service.listActiveTrackersWithHistory(30);
         expect(trackerOverview.ok).toBe(true);
         if (trackerOverview.ok) {
-            expect(trackerOverview.value[0]?.history.map((point) => point.price)).toEqual([98, 99]);
+            expect(trackerOverview.value[0]?.history.map((point) => point.close)).toEqual([98, 99]);
         }
 
         const duplicate = await service.addTracker('admin-1', { symbol: 'AAPL' });
@@ -170,15 +177,21 @@ describe('CallItService', () => {
         expect(reactivated.value.tracker.discussionId).toBe(tracker.discussionId);
     });
 
-    it('backfills hourly and daily candles and fills gaps with upserts', async () => {
+    it('backfills 15-minute, hourly, and daily candles and fills gaps with upserts', async () => {
+        const initialFifteenMinuteTs = new Date(now.getTime() - 2 * 15 * 60 * 1000);
         const initialHourlyTs = new Date(now.getTime() - 2 * HOUR_MS);
         const initialDailyTs = new Date(now.getTime() - DAY_MS);
+        fifteenMinuteHistory.set('AAPL', [candle(initialFifteenMinuteTs, 85)]);
         history.set('AAPL', [candle(initialHourlyTs, 90)]);
         longHistory.set('AAPL', [candle(initialDailyTs, 80)]);
 
         await addTracker('AAPL', 100);
+        const fifteenMinuteRequests = () => historyRequests.filter((request) => request.interval === '15m');
         const hourlyRequests = () => historyRequests.filter((request) => request.interval === '1h');
         const dailyRequests = () => historyRequests.filter((request) => request.interval === '1d');
+        expect(fifteenMinuteRequests()).toHaveLength(1);
+        expect(fifteenMinuteRequests()[0]?.from.getTime()).toBe(now.getTime() - 30 * DAY_MS);
+        expect(fifteenMinuteRequests()[0]?.to.getTime()).toBe(now.getTime());
         expect(hourlyRequests()).toHaveLength(1);
         expect(hourlyRequests()[0]?.from.getTime()).toBe(now.getTime() - 60 * DAY_MS);
         expect(hourlyRequests()[0]?.to.getTime()).toBe(now.getTime());
@@ -189,70 +202,119 @@ describe('CallItService', () => {
         now = new Date(now.getTime() + 3 * DAY_MS);
         setQuote('AAPL', 100);
         expect(await service.syncPrices()).toMatchObject({ ok: true });
+        expect(fifteenMinuteRequests()).toHaveLength(2);
+        expect(fifteenMinuteRequests()[1]?.from.getTime()).toBe(initialFifteenMinuteTs.getTime() - 15 * 60 * 1000);
         expect(hourlyRequests()).toHaveLength(2);
         expect(hourlyRequests()[1]?.from.getTime()).toBe(initialHourlyTs.getTime() - HOUR_MS);
         expect(dailyRequests()).toHaveLength(2);
         expect(dailyRequests()[1]?.from.getTime()).toBe(initialDailyTs.getTime() - DAY_MS);
 
+        fifteenMinuteHistory.set('AAPL', [candle(initialFifteenMinuteTs, 95)]);
         history.set('AAPL', [candle(initialHourlyTs, 95)]);
         now = new Date(now.getTime() + 2 * HOUR_MS);
         setQuote('AAPL', 100);
         expect(await service.syncPrices()).toMatchObject({ ok: true });
-        const hourlyRows = (await database.db.select().from(callItPriceCandle))
+        const rows = await database.db.select().from(callItPriceCandle);
+        const fifteenMinuteRows = rows
+            .filter((row) => row.interval === '15m' && row.ts.getTime() === initialFifteenMinuteTs.getTime());
+        expect(fifteenMinuteRows).toHaveLength(1);
+        expect(fifteenMinuteRows[0]?.close).toBe(95);
+        const hourlyRows = rows
             .filter((row) => row.interval === '1h' && row.ts.getTime() === initialHourlyTs.getTime());
         expect(hourlyRows).toHaveLength(1);
         expect(hourlyRows[0]?.close).toBe(95);
     });
 
-    it('refreshes candles at most once per hour during price syncs', async () => {
+    it('refreshes each candle interval at its own cadence', async () => {
         await addTracker('AAPL', 100);
-        const baseline = historyRequests.length;
+        const counts = () => ({
+            fifteenMinutes: historyRequests.filter((request) => request.interval === '15m').length,
+            hourly: historyRequests.filter((request) => request.interval === '1h').length,
+            daily: historyRequests.filter((request) => request.interval === '1d').length,
+        });
+        expect(counts()).toEqual({ fifteenMinutes: 1, hourly: 1, daily: 1 });
 
         setQuote('AAPL', 100);
         expect(await service.syncPrices()).toMatchObject({ ok: true });
-        expect(historyRequests.length).toBe(baseline + 2);
+        expect(counts()).toEqual({ fifteenMinutes: 2, hourly: 2, daily: 2 });
 
         now = new Date(now.getTime() + 15 * 60 * 1000);
         setQuote('AAPL', 101);
         expect(await service.syncPrices()).toMatchObject({ ok: true });
-        expect(historyRequests.length).toBe(baseline + 2);
+        expect(counts()).toEqual({ fifteenMinutes: 3, hourly: 2, daily: 2 });
 
         now = new Date(now.getTime() + HOUR_MS);
         setQuote('AAPL', 102);
         expect(await service.syncPrices()).toMatchObject({ ok: true });
-        expect(historyRequests.length).toBe(baseline + 4);
+        expect(counts()).toEqual({ fifteenMinutes: 4, hourly: 3, daily: 3 });
     });
 
-    it('queries hourly candles for short ranges and daily candles for long ranges', async () => {
-        history.set('AAPL', [candle(new Date(now.getTime() - 2 * HOUR_MS), 111)]);
-        longHistory.set('AAPL', [candle(new Date(now.getTime() - 2 * DAY_MS), 222)]);
+    it('queries 15-minute, hourly, or daily candles based on the range', async () => {
+        fifteenMinuteHistory.set('AAPL', [candle(new Date(now.getTime() - 30 * 60 * 1000), 111)]);
+        history.set('AAPL', [candle(new Date(now.getTime() - 2 * HOUR_MS), 222)]);
+        longHistory.set('AAPL', [candle(new Date(now.getTime() - 2 * DAY_MS), 333)]);
         const tracker = await addTracker('AAPL', 100);
 
+        const day = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 1 });
+        expect(day.ok && day.value.history.map((point) => point.close)).toEqual([111]);
+
         const week = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 7 });
-        expect(week.ok && week.value.history.map((point) => point.price)).toEqual([111]);
+        expect(week.ok && week.value.history.map((point) => point.close)).toEqual([222]);
 
         const month = await service.getTrackerDetail('user-1', tracker.id, { historyDays: 30 });
-        expect(month.ok && month.value.history.map((point) => point.price)).toEqual([222]);
+        expect(month.ok && month.value.history.map((point) => point.close)).toEqual([333]);
 
-        const overview = await service.listActiveTrackersWithHistory(7);
-        expect(overview.ok && overview.value[0]?.history.map((point) => point.price)).toEqual([111]);
+        const dayOverview = await service.listActiveTrackersWithHistory(1);
+        expect(dayOverview.ok && dayOverview.value[0]?.history.map((point) => point.close)).toEqual([111]);
+
+        const weekOverview = await service.listActiveTrackersWithHistory(7);
+        expect(weekOverview.ok && weekOverview.value[0]?.history.map((point) => point.close)).toEqual([222]);
     });
 
     it('refreshes candles when a removed tracker is reactivated', async () => {
         const tracker = await addTracker('AAPL', 100);
-        expect(historyRequests).toHaveLength(2);
+        expect(historyRequests).toHaveLength(3);
 
         expect(await service.removeTracker(tracker.id)).toMatchObject({ ok: true, value: null });
+        fifteenMinuteHistory.set('AAPL', [candle(new Date(now.getTime() - 30 * 60 * 1000), 62)]);
         history.set('AAPL', [candle(new Date(now.getTime() - 2 * HOUR_MS), 61)]);
         longHistory.set('AAPL', [candle(new Date(now.getTime() - 2 * DAY_MS), 60)]);
 
         expect(await service.addTracker('admin-1', { symbol: 'AAPL' }))
             .toMatchObject({ ok: true, value: { created: false, tracker: { isActive: true } } });
-        expect(historyRequests).toHaveLength(4);
+        expect(historyRequests).toHaveLength(6);
 
         const rows = await database.db.select().from(callItPriceCandle);
+        expect(rows.filter((row) => row.interval === '15m').map((row) => row.close)).toContain(62);
         expect(rows.filter((row) => row.interval === '1h').map((row) => row.close)).toContain(61);
         expect(rows.filter((row) => row.interval === '1d').map((row) => row.close)).toContain(60);
+    });
+
+    it('prunes old 15-minute and hourly candles while retaining daily history', async () => {
+        const tracker = await addTracker('AAPL', 100);
+        const oldFifteenMinute = new Date(now.getTime() - 31 * DAY_MS);
+        const recentFifteenMinute = new Date(now.getTime() - 29 * DAY_MS);
+        const oldHourly = new Date(now.getTime() - 61 * DAY_MS);
+        const recentHourly = new Date(now.getTime() - 59 * DAY_MS);
+        const oldDaily = new Date(now.getTime() - 365 * DAY_MS);
+        await database.db.insert(callItPriceCandle).values([
+            { trackerId: tracker.id, interval: '15m', ts: oldFifteenMinute, open: 1, high: 1, low: 1, close: 1, volume: null },
+            { trackerId: tracker.id, interval: '15m', ts: recentFifteenMinute, open: 2, high: 2, low: 2, close: 2, volume: null },
+            { trackerId: tracker.id, interval: '1h', ts: oldHourly, open: 3, high: 3, low: 3, close: 3, volume: null },
+            { trackerId: tracker.id, interval: '1h', ts: recentHourly, open: 4, high: 4, low: 4, close: 4, volume: null },
+            { trackerId: tracker.id, interval: '1d', ts: oldDaily, open: 5, high: 5, low: 5, close: 5, volume: null },
+        ]);
+
+        setQuote('AAPL', 100);
+        expect(await service.syncPrices()).toMatchObject({ ok: true });
+
+        const rows = await database.db.select().from(callItPriceCandle);
+        const timestamps = new Set(rows.map((row) => `${row.interval}:${row.ts.getTime()}`));
+        expect(timestamps.has(`15m:${oldFifteenMinute.getTime()}`)).toBe(false);
+        expect(timestamps.has(`15m:${recentFifteenMinute.getTime()}`)).toBe(true);
+        expect(timestamps.has(`1h:${oldHourly.getTime()}`)).toBe(false);
+        expect(timestamps.has(`1h:${recentHourly.getTime()}`)).toBe(true);
+        expect(timestamps.has(`1d:${oldDaily.getTime()}`)).toBe(true);
     });
 
     it('validates prediction input, supports idempotent IDs, and enforces the active-prediction limit', async () => {
@@ -462,7 +524,7 @@ describe('CallItService', () => {
         const overview = await service.listActiveTrackersWithHistory(1825);
         expect(overview.ok).toBe(true);
         if (!overview.ok) return;
-        expect(overview.value[0]?.history.map((point) => point.price)).toEqual([80, 90]);
+        expect(overview.value[0]?.history.map((point) => point.close)).toEqual([80, 90]);
         expect(historyRequests).toHaveLength(requestsAfterAdd);
         expect(historyRequests.some((request) => request.symbol === 'AAPL' && request.interval === '1d')).toBe(true);
         expect(await service.listActiveTrackersWithHistory(1826))
@@ -558,7 +620,7 @@ describe('CallItService', () => {
             },
         });
         if (preview.ok) {
-            expect(preview.value.history.map((point) => point.price)).toEqual([99, 99.5]);
+            expect(preview.value.history.map((point) => point.close)).toEqual([99, 99.5]);
         }
         expect(historyRequests[historyRequests.length - 1]?.interval).toBe('1d');
         expect(await database.db.select().from(callItTracker)).toHaveLength(0);

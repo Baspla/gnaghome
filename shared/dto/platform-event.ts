@@ -99,6 +99,12 @@ export const CallItSettingsChangedEventSchema = t.Object({
 });
 export type CallItSettingsChangedEvent = typeof CallItSettingsChangedEventSchema.static;
 
+export const CallItPreferencesChangedEventSchema = t.Object({
+    ...EventBaseSchema,
+    type: t.Literal('callit.preferences.changed'),
+});
+export type CallItPreferencesChangedEvent = typeof CallItPreferencesChangedEventSchema.static;
+
 /** Discriminated union of thin, actionable platform events sent through Centrifugo. */
 export const PlatformEventSchema = t.Union([
     ActivityFeedChangedEventSchema,
@@ -115,6 +121,7 @@ export const PlatformEventSchema = t.Union([
     CallItUserStatsChangedEventSchema,
     CallItTrackerChangedEventSchema,
     CallItSettingsChangedEventSchema,
+    CallItPreferencesChangedEventSchema,
 ]);
 
 export type PlatformEvent = typeof PlatformEventSchema.static;
@@ -134,4 +141,5 @@ export const PLATFORM_EVENT_TYPES = [
     'callit.user-stats.changed',
     'callit.tracker.changed',
     'callit.settings.changed',
+    'callit.preferences.changed',
 ] as const satisfies readonly PlatformEvent['type'][];

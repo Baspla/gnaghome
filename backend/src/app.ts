@@ -22,6 +22,7 @@ type FilesServiceDependency = Pick<import('./platform/files/service').FilesServi
 type CustomEmojiServiceDependency = Pick<import('./platform/custom-emoji/service').CustomEmojiService, 'getCatalog' | 'createEmoji' | 'deleteEmoji'>;
 type CrewNowServiceDependency = Pick<import('./apps/crewnow/service').CrewNowService, 'createId' | 'createPost' | 'updatePost' | 'deletePost' | 'discardPendingUpload' | 'getPost' | 'getTimeline' | 'searchUsers' | 'getUserStats' | 'getPostForActivity' | 'getActivityTaggedUsers' | 'getTagIdsForPost'>;
 type CrewNowPreferencesServiceDependency = Pick<import('./apps/crewnow/preferences').CrewNowPreferencesService, 'getPreferences' | 'updatePreferences'>;
+type CallItPreferencesServiceDependency = Pick<import('./apps/callit/preferences').CallItPreferencesService, 'getPreferences' | 'updatePreferences'>;
 type CallItServiceDependency = Pick<
     import('./apps/callit/service').CallItService,
     | 'getOverview'
@@ -57,6 +58,7 @@ export type AppDependencies = {
     crewNowService: CrewNowServiceDependency;
     crewNowPreferencesService: CrewNowPreferencesServiceDependency;
     callitService: CallItServiceDependency;
+    callItPreferencesService: CallItPreferencesServiceDependency;
     rescheduleCallItSync: (minutes: number) => Promise<void>;
     discussionsService: DiscussionsServiceDependency;
     discussionsFeedService: DiscussionsFeedDependency;
@@ -120,7 +122,7 @@ export function createApp(dependencies: AppDependencies) {
                         .use(createFilesModule(authMiddleware, dependencies.filesService))
                         .use(createCustomEmojiModule(authMiddleware, dependencies.customEmojiService))
                         .use(createCrewNowModule(authMiddleware, dependencies.crewNowService, dependencies.crewNowPreferencesService))
-                        .use(createCallItModule(authMiddleware, dependencies.callitService, dependencies.rescheduleCallItSync))
+                        .use(createCallItModule(authMiddleware, dependencies.callitService, dependencies.callItPreferencesService, dependencies.rescheduleCallItSync))
                         .use(dependencies.realtimeModule(authMiddleware, dependencies.generateRealtimeToken))
                 )
         );

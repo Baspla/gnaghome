@@ -59,7 +59,10 @@ describe('Call It HTTP module', () => {
             async () => new Response('auth'),
             'admins',
         );
-        return new Elysia().use(createCallItModule(auth, service, async (minutes) => {
+        return new Elysia().use(createCallItModule(auth, service, {
+            getPreferences: async () => ok({ chartType: 'line' }),
+            updatePreferences: async (_userId, preferences) => ok({ chartType: preferences.chartType }),
+        }, async (minutes) => {
             rescheduled.push(minutes);
         }));
     }
@@ -106,14 +109,14 @@ describe('Call It HTTP module', () => {
             listActiveTrackersWithHistory: async () => ok([{
                 ...tracker,
                 activePredictionCount: 1,
-                history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), price: 100 }],
+                history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), open: 99, high: 101, low: 98, close: 100 }],
             }]),
             getTrackerDetail: async (_viewerUserId: string, _trackerId: string, options?: { historyDays?: number }) => {
                 trackerDetailHistoryDays = options?.historyDays;
                 return ok({
                     tracker,
                     commentCount: 0,
-                    history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), price: 100 }],
+                    history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), open: 99, high: 101, low: 98, close: 100 }],
                     activePredictions: [prediction],
                     completedPredictions: [],
                 });
@@ -130,7 +133,7 @@ describe('Call It HTTP module', () => {
                 price: 100,
                 marketTime: new Date('2026-01-01T12:00:00.000Z'),
                 marketState: 'REGULAR',
-                history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), price: 100 }],
+                history: [{ observedAt: new Date('2026-01-01T12:00:00.000Z'), open: 99, high: 101, low: 98, close: 100 }],
                 existingTracker: null,
             }),
             addTracker: async () => ok({ tracker: { ...tracker, activePredictionCount: 0 }, created: true }),
@@ -193,7 +196,7 @@ describe('Call It HTTP module', () => {
             items: [{
                 id: 'tracker-1',
                 activePredictionCount: 1,
-                history: [{ observedAt: '2026-01-01T12:00:00.000Z', price: 100 }],
+                history: [{ observedAt: '2026-01-01T12:00:00.000Z', open: 99, high: 101, low: 98, close: 100 }],
             }],
         });
 
@@ -233,7 +236,7 @@ describe('Call It HTTP module', () => {
             symbol: 'AAPL',
             price: 100,
             marketState: 'REGULAR',
-            history: [{ observedAt: '2026-01-01T12:00:00.000Z', price: 100 }],
+            history: [{ observedAt: '2026-01-01T12:00:00.000Z', open: 99, high: 101, low: 98, close: 100 }],
         });
 
         expect((await app().handle(new Request('http://localhost/callit/admin/trackers/tracker-1/full', {
