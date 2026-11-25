@@ -116,6 +116,7 @@ export type CallItStats = {
     activePredictionCount: number;
     activeWagerTotal: number;
     allTimeProfit: number;
+    unrealizedProfit: number;
     completedCount: number;
     wins: number;
     losses: number;
@@ -125,6 +126,8 @@ export type CallItLeaderboardEntry = {
     rank: number;
     user: CallItUserSummary;
     allTimeProfit: number;
+    unrealizedProfit: number;
+    activeCount: number;
     completedCount: number;
     wins: number;
     losses: number;
@@ -237,10 +240,15 @@ function computeProfit(
     };
 }
 
-function computeStats(predictions: Array<Pick<CallItPrediction, 'status' | 'wager' | 'profitLoss'>>): CallItStats {
+type StatsInput = Pick<CallItPrediction, 'status' | 'wager' | 'direction' | 'startPrice' | 'profitLoss'> & {
+    currentPrice: number | null;
+};
+
+function computeStats(predictions: StatsInput[]): CallItStats {
     let activePredictionCount = 0;
     let activeWagerTotal = 0;
     let allTimeProfit = 0;
+    let unrealizedProfit = 0;
     let completedCount = 0;
     let wins = 0;
     let losses = 0;
@@ -249,6 +257,14 @@ function computeStats(predictions: Array<Pick<CallItPrediction, 'status' | 'wage
         if (prediction.status === 'ACTIVE') {
             activePredictionCount += 1;
             activeWagerTotal += prediction.wager;
+            if (prediction.currentPrice !== null && prediction.currentPrice > 0) {
+                unrealizedProfit += computeProfit(
+                    prediction.wager,
+                    prediction.direction,
+                    prediction.startPrice,
+                    prediction.currentPrice,
+                ).profitLoss;
+            }
             continue;
         }
         completedCount += 1;
@@ -258,7 +274,15 @@ function computeStats(predictions: Array<Pick<CallItPrediction, 'status' | 'wage
         else if (profit < 0) losses += 1;
     }
 
-    return { activePredictionCount, activeWagerTotal, allTimeProfit, completedCount, wins, losses };
+    return {
+        activePredictionCount,
+        activeWagerTotal,
+        allTimeProfit,
+        unrealizedProfit,
+        completedCount,
+        wins,
+        losses,
+    };
 }
 
 function downsampleHistory(
@@ -420,7 +444,7 @@ export class CallItService {
     async listActiveTrackersWithHistory(
         historyDays = 7,
     ): Promise<Result<CallItTrackerOverviewItem[], BadRequestError | InternalError>> {
-        if (!Number.isInteger(historyDays) || historyDays < 1 || historyDays > 365) {
+        if (!Number.isInteger(historyDays) || historyDays < 1 || historyDays > CALL_IT_MAX_HISTORY_DAYS) {
             return err({ status: 400, code: 'BAD_REQUEST', message: 'Der Verlaufszeitraum ist ungültig.' });
         }
         try {
@@ -433,6 +457,9 @@ export class CallItService {
             if (trackers.length === 0) return ok([]);
 
             const now = this.clock();
+            if (historyDays > BACKFILL_DAYS) {
+                await Promise.all(trackers.map((tracker) => this.ensureLongHistory(tracker, now)));
+            }
             const from = new Date(now.getTime() - historyDays * 24 * 60 * 60 * 1000);
             const historyRows = await this.db.select({
                 trackerId: callItPriceSnapshot.trackerId,
@@ -1038,39 +1065,95 @@ export class CallItService {
                 .orderBy(asc(callItPrediction.endsAt), asc(callItPrediction.createdAt));
             const activeSummaries = await this.toPredictionSummaries(activeRows);
 
-            const myPredictions = await this.db.select().from(callItPrediction)
+            const myPredictionRows = await this.db.select({
+                prediction: callItPrediction,
+                currentPrice: callItTracker.lastPrice,
+            }).from(callItPrediction)
+                .innerJoin(callItTracker, eq(callItTracker.id, callItPrediction.trackerId))
                 .where(eq(callItPrediction.userId, viewerUserId));
+            const myPredictions: StatsInput[] = myPredictionRows.map((row) => ({
+                ...row.prediction,
+                currentPrice: row.currentPrice,
+            }));
 
-            const profit = sql<number>`coalesce(sum(case when ${callItPrediction.status} = 'COMPLETED' then ${callItPrediction.profitLoss} else 0 end), 0)`;
-            const completed = sql<number>`coalesce(sum(case when ${callItPrediction.status} = 'COMPLETED' then 1 else 0 end), 0)`;
-            const wins = sql<number>`coalesce(sum(case when ${callItPrediction.status} = 'COMPLETED' and ${callItPrediction.profitLoss} > 0 then 1 else 0 end), 0)`;
-            const losses = sql<number>`coalesce(sum(case when ${callItPrediction.status} = 'COMPLETED' and ${callItPrediction.profitLoss} < 0 then 1 else 0 end), 0)`;
             const leaderboardRows = await this.db.select({
-                id: user.id,
+                userId: user.id,
                 name: user.name,
                 image: user.image,
-                profit,
-                completed,
-                wins,
-                losses,
+                status: callItPrediction.status,
+                wager: callItPrediction.wager,
+                direction: callItPrediction.direction,
+                startPrice: callItPrediction.startPrice,
+                profitLoss: callItPrediction.profitLoss,
+                currentPrice: callItTracker.lastPrice,
             }).from(callItPrediction)
                 .innerJoin(user, eq(user.id, callItPrediction.userId))
-                .groupBy(user.id)
-                .orderBy(desc(profit), desc(completed), asc(user.name));
+                .innerJoin(callItTracker, eq(callItTracker.id, callItPrediction.trackerId));
+
+            const leaderboardUsers = new Map<string, {
+                user: CallItUserSummary;
+                completedProfit: number;
+                unrealizedProfit: number;
+                activeCount: number;
+                completedCount: number;
+                wins: number;
+                losses: number;
+            }>();
+            for (const row of leaderboardRows) {
+                const entry = leaderboardUsers.get(row.userId) ?? {
+                    user: { id: row.userId, name: row.name, image: row.image },
+                    completedProfit: 0,
+                    unrealizedProfit: 0,
+                    activeCount: 0,
+                    completedCount: 0,
+                    wins: 0,
+                    losses: 0,
+                };
+                if (row.status === 'ACTIVE') {
+                    entry.activeCount += 1;
+                    if (row.currentPrice !== null && row.currentPrice > 0) {
+                        entry.unrealizedProfit += computeProfit(
+                            row.wager,
+                            row.direction,
+                            row.startPrice,
+                            row.currentPrice,
+                        ).profitLoss;
+                    }
+                } else {
+                    entry.completedCount += 1;
+                    const profit = row.profitLoss ?? 0;
+                    entry.completedProfit += profit;
+                    if (profit > 0) entry.wins += 1;
+                    else if (profit < 0) entry.losses += 1;
+                }
+                leaderboardUsers.set(row.userId, entry);
+            }
+
+            const leaderboard = [...leaderboardUsers.values()]
+                .map((entry) => ({
+                    ...entry,
+                    allTimeProfit: entry.completedProfit + entry.unrealizedProfit,
+                }))
+                .sort((a, b) => b.allTimeProfit - a.allTimeProfit
+                    || b.completedCount - a.completedCount
+                    || a.user.name.localeCompare(b.user.name))
+                .map((entry, index) => ({
+                    rank: index + 1,
+                    user: entry.user,
+                    allTimeProfit: entry.allTimeProfit,
+                    unrealizedProfit: entry.unrealizedProfit,
+                    activeCount: entry.activeCount,
+                    completedCount: entry.completedCount,
+                    wins: entry.wins,
+                    losses: entry.losses,
+                }));
 
             return ok({
                 myStats: computeStats(myPredictions),
                 limits: { maxActivePredictionsPerUser: settings.maxActivePredictionsPerUser },
                 myActivePredictions: activeSummaries.filter((prediction) => prediction.user.id === viewerUserId),
                 otherActivePredictions: activeSummaries.filter((prediction) => prediction.user.id !== viewerUserId),
-                leaderboard: leaderboardRows.map((row, index) => ({
-                    rank: index + 1,
-                    user: { id: row.id, name: row.name, image: row.image },
-                    allTimeProfit: Number(row.profit),
-                    completedCount: Number(row.completed),
-                    wins: Number(row.wins),
-                    losses: Number(row.losses),
-                })),
+                leaderboard,
             });
         } catch (error) {
             logger.error('failed to load overview', { viewerUserId, error: String(error) });
@@ -1114,7 +1197,10 @@ export class CallItService {
 
             return ok({
                 user: toUserSummary(targetUser),
-                stats: computeStats(rows.map((row) => row.prediction)),
+                stats: computeStats(rows.map((row) => ({
+                    ...row.prediction,
+                    currentPrice: row.tracker.lastPrice,
+                }))),
                 limits: { maxActivePredictionsPerUser: settings.maxActivePredictionsPerUser },
                 activePredictions,
                 completedPredictions,

@@ -368,6 +368,55 @@ describe('CallItService', () => {
         expect(secondSync).toMatchObject({ ok: true, value: { predictionsResolved: 0 } });
     });
 
+    it('counts open results in stats and the leaderboard', async () => {
+        const tracker = await addTracker('AAPL', 100);
+        const created = await createPrediction('user-1', tracker.id, { direction: 'UP', durationKey: '7d', wager: 1000 });
+        expect(created.ok).toBe(true);
+
+        now = new Date(now.getTime() + DAY_MS);
+        setQuote('AAPL', 110);
+        expect(await service.syncPrices()).toMatchObject({ ok: true, value: { predictionsResolved: 0 } });
+
+        const overview = await service.getOverview('user-1');
+        expect(overview).toMatchObject({
+            ok: true,
+            value: {
+                myStats: {
+                    activePredictionCount: 1,
+                    activeWagerTotal: 1000,
+                    allTimeProfit: 0,
+                    unrealizedProfit: 100,
+                    completedCount: 0,
+                },
+                leaderboard: [{
+                    rank: 1,
+                    user: { id: 'user-1' },
+                    allTimeProfit: 100,
+                    unrealizedProfit: 100,
+                    activeCount: 1,
+                    completedCount: 0,
+                }],
+            },
+        });
+    });
+
+    it('serves five years of tracker overview history on demand', async () => {
+        const tracker = await addTracker('AAPL', 100);
+        expect(tracker.id).toBeTruthy();
+        longHistory.set('AAPL', [
+            { observedAt: new Date('2024-01-02T20:00:00.000Z'), price: 80 },
+            { observedAt: new Date('2025-01-02T20:00:00.000Z'), price: 90 },
+        ]);
+
+        const overview = await service.listActiveTrackersWithHistory(1825);
+        expect(overview.ok).toBe(true);
+        if (!overview.ok) return;
+        expect(overview.value[0]?.history.map((point) => point.price)).toEqual([80, 90, 100]);
+        expect(historyRequests.some((request) => request.symbol === 'AAPL' && request.interval === '1d')).toBe(true);
+        expect(await service.listActiveTrackersWithHistory(1826))
+            .toMatchObject({ ok: false, error: { status: 400 } });
+    });
+
     it('keeps syncing removed trackers while they still have active predictions', async () => {
         const tracker = await addTracker('TSLA', 200);
         const created = await createPrediction('user-1', tracker.id, { durationKey: '1d' });

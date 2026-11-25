@@ -78,6 +78,14 @@
         return activity.data.direction ? directionLabel(activity.data.direction) : '';
     }
 
+    function callItDirectionVerb(activity: Activity): string {
+        return activity.data.direction === 'DOWN' ? 'fällt' : 'steigt';
+    }
+
+    function possessiveSuffix(name: string): string {
+        return /[sßzx]$/i.test(name.trim()) ? "'" : 's';
+    }
+
     async function loadActivities(append: boolean) {
         if (append) loadingMore = true;
         else loading = true;
@@ -176,20 +184,22 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm leading-6 text-surface-700-300">
-                                {#if activity.actor}
-                                    <Username
-                                        userId={activity.actor.id}
-                                        name={activity.actor.name}
-                                        image={activity.actor.image}
-                                        class="font-semibold text-surface-950-50"
-                                    />
-                                {:else if activity.subject}
-                                    <Username
-                                        userId={activity.subject.id}
-                                        name={activity.subject.name}
-                                        image={activity.subject.image}
-                                        class="font-semibold text-surface-950-50"
-                                    />
+                                {#if activity.type !== 'callit.prediction.completed'}
+                                    {#if activity.actor}
+                                        <Username
+                                            userId={activity.actor.id}
+                                            name={activity.actor.name}
+                                            image={activity.actor.image}
+                                            class="font-semibold text-surface-950-50"
+                                        />
+                                    {:else if activity.subject}
+                                        <Username
+                                            userId={activity.subject.id}
+                                            name={activity.subject.name}
+                                            image={activity.subject.image}
+                                            class="font-semibold text-surface-950-50"
+                                        />
+                                    {/if}
                                 {/if}
                                 {#if activity.type === 'profile.updated' && activity.subject && activity.actor?.id !== activity.subject.id}
                                     <span>hat das Profil von </span>
@@ -240,7 +250,18 @@
                                     {/if}
                                     <span> platziert.</span>
                                 {:else if activity.type === 'callit.prediction.completed'}
-                                    <span> hat die Vorhersage auf </span>
+                                    {@const predictionOwner = activity.subject ?? activity.actor}
+                                    {#if predictionOwner}
+                                        <Username
+                                            userId={predictionOwner.id}
+                                            name={predictionOwner.name}
+                                            image={predictionOwner.image}
+                                            class="font-semibold text-surface-950-50"
+                                            suffix={possessiveSuffix(predictionOwner.name)}
+                                        /><span>{' '}Vorhersage{activity.data.direction ? ', dass ' : ' auf '}</span>
+                                    {:else}
+                                        <span>Die Vorhersage{activity.data.direction ? ', dass ' : ' auf '}</span>
+                                    {/if}
                                     {#if activity.data.trackerId && activity.data.trackerSymbol}
                                         <a
                                             class="font-semibold text-primary-700-300 hover:underline"
@@ -250,13 +271,13 @@
                                         <span class="font-semibold">{activity.data.trackerSymbol ?? 'einen Tracker'}</span>
                                     {/if}
                                     {#if activity.data.direction}
-                                        <span> ({callItDirection(activity)})</span>
+                                        <span> {callItDirectionVerb(activity)}, war </span>
+                                    {:else}
+                                        <span> war </span>
                                     {/if}
-                                    <span> abgeschlossen – </span>
                                     <span class={activity.data.successful ? 'font-semibold text-success-600-400' : 'font-semibold text-error-600-400'}>
-                                        {activity.data.successful ? 'erfolgreich' : 'nicht erfolgreich'}
+                                        {activity.data.successful ? 'korrekt' : 'falsch'}.
                                     </span>
-                                    <span>.</span>
                                 {:else}
                                     <span>{activityDescription(activity)}</span>
                                 {/if}

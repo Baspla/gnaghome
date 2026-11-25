@@ -1,15 +1,22 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { Search } from '@lucide/svelte';
     import { page } from '$app/state';
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import PageHeading from '$lib/components/PageHeading.svelte';
+    import Pagination from '$lib/components/Pagination.svelte';
+    import HistoryRangeSelector from '$lib/components/callit/HistoryRangeSelector.svelte';
     import PredictionCard from '$lib/components/callit/PredictionCard.svelte';
     import Leaderboard from '$lib/components/callit/Leaderboard.svelte';
     import TrackerOverviewCard from '$lib/components/callit/TrackerOverviewCard.svelte';
-    import { formatEuroPoints } from '$lib/components/callit/format';
+    import { formatEuroPoints, historyRangeLabel } from '$lib/components/callit/format';
     import type { CallItOverview, CallItTrackerOverviewItem } from '$lib/components/callit/types';
     import { setPageTitle } from '$lib/utils';
+
+    const PREDICTIONS_PER_PAGE = 5;
+    const LEADERBOARD_PER_PAGE = 10;
+    const TRACKERS_PER_PAGE = 6;
 
     const gateway = getGatewayManager();
     const currentUserId = $derived(page.data.user?.id ?? '');
@@ -19,6 +26,48 @@
     let errorMessage = $state<string | null>(null);
     let trackersLoading = $state(true);
     let trackersError = $state<string | null>(null);
+    let historyDays = $state(7);
+    let trackerSearch = $state('');
+    let trackersRequestId = 0;
+
+    let myPredictionsPage = $state(1);
+    let groupPredictionsPage = $state(1);
+    let leaderboardPage = $state(1);
+    let trackersPage = $state(1);
+
+    const myPredictionsPageCount = $derived(Math.max(1, Math.ceil((overview?.myActivePredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentMyPredictionsPage = $derived(Math.min(myPredictionsPage, myPredictionsPageCount));
+    const visibleMyPredictions = $derived((overview?.myActivePredictions ?? []).slice(
+        (currentMyPredictionsPage - 1) * PREDICTIONS_PER_PAGE,
+        currentMyPredictionsPage * PREDICTIONS_PER_PAGE,
+    ));
+
+    const groupPredictionsPageCount = $derived(Math.max(1, Math.ceil((overview?.otherActivePredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentGroupPredictionsPage = $derived(Math.min(groupPredictionsPage, groupPredictionsPageCount));
+    const visibleGroupPredictions = $derived((overview?.otherActivePredictions ?? []).slice(
+        (currentGroupPredictionsPage - 1) * PREDICTIONS_PER_PAGE,
+        currentGroupPredictionsPage * PREDICTIONS_PER_PAGE,
+    ));
+
+    const leaderboardPageCount = $derived(Math.max(1, Math.ceil((overview?.leaderboard.length ?? 0) / LEADERBOARD_PER_PAGE)));
+    const currentLeaderboardPage = $derived(Math.min(leaderboardPage, leaderboardPageCount));
+    const visibleLeaderboard = $derived((overview?.leaderboard ?? []).slice(
+        (currentLeaderboardPage - 1) * LEADERBOARD_PER_PAGE,
+        currentLeaderboardPage * LEADERBOARD_PER_PAGE,
+    ));
+
+    const filteredTrackers = $derived.by(() => {
+        const query = trackerSearch.trim().toLowerCase();
+        if (!query) return trackers;
+        return trackers.filter((tracker) => tracker.symbol.toLowerCase().includes(query)
+            || tracker.name.toLowerCase().includes(query));
+    });
+    const trackersPageCount = $derived(Math.max(1, Math.ceil(filteredTrackers.length / TRACKERS_PER_PAGE)));
+    const currentTrackersPage = $derived(Math.min(trackersPage, trackersPageCount));
+    const visibleTrackers = $derived(filteredTrackers.slice(
+        (currentTrackersPage - 1) * TRACKERS_PER_PAGE,
+        currentTrackersPage * TRACKERS_PER_PAGE,
+    ));
 
     async function loadOverview() {
         try {
@@ -33,17 +82,28 @@
         }
     }
 
-    async function loadTrackers() {
+    async function loadTrackers(showLoading = false) {
+        if (showLoading) trackersLoading = true;
+        const requestId = ++trackersRequestId;
         try {
-            const response = await api.callit.trackers.overview.get({ query: { historyDays: 7 } });
+            const response = await api.callit.trackers.overview.get({ query: { historyDays } });
+            if (requestId !== trackersRequestId) return;
             if (response.error || !response.data) throw new Error('load failed');
             trackers = response.data.items;
             trackersError = null;
         } catch {
+            if (requestId !== trackersRequestId) return;
             trackersError = 'Tracker konnten nicht geladen werden.';
         } finally {
-            trackersLoading = false;
+            if (requestId === trackersRequestId) trackersLoading = false;
         }
+    }
+
+    function setHistoryRange(days: number) {
+        if (historyDays === days) return;
+        historyDays = days;
+        trackersPage = 1;
+        void loadTrackers(true);
     }
 
     function loadAll() {
@@ -94,7 +154,7 @@
             <button type="button" class="btn preset-outlined mt-3 enabled:cursor-pointer" onclick={() => void loadOverview()}>Erneut versuchen</button>
         </div>
     {:else if overview}
-        <section class="grid grid-cols-2 gap-3 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4 sm:grid-cols-4" aria-label="Deine Call-it-Statistik">
+        <section class="grid grid-cols-2 gap-3 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4 sm:grid-cols-5" aria-label="Deine Call-it-Statistik">
             <div>
                 <p class="text-xs text-surface-600-400">Laufende Vorhersagen</p>
                 <p class="text-xl font-bold text-surface-950-50">{overview.myStats.activePredictionCount} / {overview.limits.maxActivePredictionsPerUser}</p>
@@ -107,6 +167,12 @@
                 <p class="text-xs text-surface-600-400">Allzeit-Gewinn</p>
                 <p class="text-xl font-bold {overview.myStats.allTimeProfit > 0 ? 'text-success-700-300' : overview.myStats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
                     {formatEuroPoints(overview.myStats.allTimeProfit, true)}
+                </p>
+            </div>
+            <div>
+                <p class="text-xs text-surface-600-400">Aktuell</p>
+                <p class="text-xl font-bold {overview.myStats.unrealizedProfit > 0 ? 'text-success-700-300' : overview.myStats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatEuroPoints(overview.myStats.unrealizedProfit, true)}
                 </p>
             </div>
             <div>
@@ -131,9 +197,15 @@
                     <a href="/callit/create" class="btn preset-filled mt-3">Erste Vorhersage platzieren</a>
                 </div>
             {:else}
-                {#each overview.myActivePredictions as prediction (prediction.id)}
+                {#each visibleMyPredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} showUser={false} />
                 {/each}
+                <Pagination
+                    page={currentMyPredictionsPage}
+                    pageCount={myPredictionsPageCount}
+                    onPageChange={(page) => myPredictionsPage = page}
+                    label="Seiten für deine laufenden Vorhersagen"
+                />
             {/if}
         </section>
 
@@ -147,18 +219,48 @@
                     Aktuell laufen keine anderen Vorhersagen.
                 </p>
             {:else}
-                {#each overview.otherActivePredictions as prediction (prediction.id)}
+                {#each visibleGroupPredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} />
                 {/each}
+                <Pagination
+                    page={currentGroupPredictionsPage}
+                    pageCount={groupPredictionsPageCount}
+                    onPageChange={(page) => groupPredictionsPage = page}
+                    label="Seiten für die laufenden Vorhersagen der Gruppe"
+                />
             {/if}
         </section>
 
-        <Leaderboard entries={overview.leaderboard} {currentUserId} />
+        <Leaderboard
+            entries={visibleLeaderboard}
+            {currentUserId}
+            page={currentLeaderboardPage}
+            pageCount={leaderboardPageCount}
+            onPageChange={(page) => leaderboardPage = page}
+        />
 
         <section class="flex flex-col gap-3" aria-labelledby="callit-trackers-heading">
             <div class="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 id="callit-trackers-heading" class="text-lg font-semibold text-surface-950-50">Tracker</h2>
-                <span class="text-xs text-surface-600-400">Kursverlauf der letzten 7 Tage</span>
+                <span class="text-xs text-surface-600-400">Kursverlauf: {historyRangeLabel(historyDays)}</span>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <label class="relative min-w-0 flex-1 sm:max-w-xs">
+                    <span class="sr-only">Tracker nach Symbol oder Name filtern</span>
+                    <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-500-400" aria-hidden="true" />
+                    <input
+                        class="input w-full pl-9"
+                        type="search"
+                        placeholder="Tracker suchen …"
+                        bind:value={trackerSearch}
+                        oninput={() => trackersPage = 1}
+                    />
+                </label>
+                <HistoryRangeSelector
+                    value={historyDays}
+                    onChange={setHistoryRange}
+                    label="Zeitraum für Tracker-Kursverläufe"
+                />
             </div>
             {#if trackersLoading}
                 <p class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 px-5 py-8 text-center text-sm text-surface-600-400" role="status">
@@ -173,12 +275,23 @@
                 <p class="rounded-2xl border border-dashed border-surface-300-700/60 px-5 py-8 text-center text-sm text-surface-600-400">
                     Noch keine Tracker konfiguriert. Ein Administrator kann sie in den Einstellungen hinzufügen.
                 </p>
+            {:else if filteredTrackers.length === 0}
+                <div class="rounded-2xl border border-dashed border-surface-300-700/60 px-5 py-8 text-center">
+                    <p class="text-sm text-surface-600-400">Keine Tracker passen zur Suche.</p>
+                    <button type="button" class="btn preset-outlined mt-3 enabled:cursor-pointer" onclick={() => trackerSearch = ''}>Suche zurücksetzen</button>
+                </div>
             {:else}
                 <div class="grid gap-3 sm:grid-cols-2">
-                    {#each trackers as tracker (tracker.id)}
+                    {#each visibleTrackers as tracker (tracker.id)}
                         <TrackerOverviewCard {tracker} />
                     {/each}
                 </div>
+                <Pagination
+                    page={currentTrackersPage}
+                    pageCount={trackersPageCount}
+                    onPageChange={(page) => trackersPage = page}
+                    label="Seiten für Tracker"
+                />
             {/if}
         </section>
     {/if}

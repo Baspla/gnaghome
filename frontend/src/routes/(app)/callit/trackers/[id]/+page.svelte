@@ -4,17 +4,19 @@
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import PageHeading from '$lib/components/PageHeading.svelte';
+    import Pagination from '$lib/components/Pagination.svelte';
     import PredictionCard from '$lib/components/callit/PredictionCard.svelte';
     import PriceHistoryChart from '$lib/components/callit/PriceHistoryChart.svelte';
+    import HistoryRangeSelector from '$lib/components/callit/HistoryRangeSelector.svelte';
     import Discussion from '$lib/components/Discussion.svelte';
-    import { formatDateTime, formatTrackerPrice, historyRangeLabel } from '$lib/components/callit/format';
+    import { formatDateTime, formatTrackerPrice } from '$lib/components/callit/format';
     import type { CallItTrackerDetail } from '$lib/components/callit/types';
     import { setPageTitle } from '$lib/utils';
 
+    const PREDICTIONS_PER_PAGE = 5;
+
     const gateway = getGatewayManager();
     const trackerId = $derived(page.params.id ?? '');
-    // Keep the largest range in sync with CALL_IT_MAX_HISTORY_DAYS on the backend.
-    const historyRanges = [1, 7, 30, 90, 365, 1825] as const;
     let historyDays = $state<number>(30);
     let data = $state<CallItTrackerDetail | null>(null);
     let commentCount = $state(0);
@@ -22,6 +24,21 @@
     let historyLoading = $state(false);
     let historyRequestId = 0;
     let errorMessage = $state<string | null>(null);
+    let activePage = $state(1);
+    let completedPage = $state(1);
+
+    const activePageCount = $derived(Math.max(1, Math.ceil((data?.activePredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentActivePage = $derived(Math.min(activePage, activePageCount));
+    const visibleActivePredictions = $derived((data?.activePredictions ?? []).slice(
+        (currentActivePage - 1) * PREDICTIONS_PER_PAGE,
+        currentActivePage * PREDICTIONS_PER_PAGE,
+    ));
+    const completedPageCount = $derived(Math.max(1, Math.ceil((data?.completedPredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentCompletedPage = $derived(Math.min(completedPage, completedPageCount));
+    const visibleCompletedPredictions = $derived((data?.completedPredictions ?? []).slice(
+        (currentCompletedPage - 1) * PREDICTIONS_PER_PAGE,
+        currentCompletedPage * PREDICTIONS_PER_PAGE,
+    ));
 
     async function load() {
         const requestId = ++historyRequestId;
@@ -120,18 +137,11 @@
         <section class="flex flex-col gap-3" aria-labelledby="callit-tracker-history-heading">
             <div class="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 id="callit-tracker-history-heading" class="text-lg font-semibold text-surface-950-50">Kursverlauf</h2>
-                <div class="flex flex-wrap gap-1">
-                    {#each historyRanges as range (range)}
-                        <button
-                            type="button"
-                            aria-pressed={historyDays === range}
-                            class="rounded-md px-2.5 py-1 text-sm transition-colors enabled:cursor-pointer {historyDays === range ? 'bg-primary-500 text-primary-contrast-500' : 'text-surface-600-400 hover:bg-surface-100-900'}"
-                            onclick={() => void setRange(range)}
-                        >
-                            {historyRangeLabel(range)}
-                        </button>
-                    {/each}
-                </div>
+                <HistoryRangeSelector
+                    value={historyDays}
+                    onChange={(days) => void setRange(days)}
+                    label="Zeitraum für den Kursverlauf"
+                />
             </div>
             {#if historyLoading}
                 <p class="text-xs text-surface-600-400" role="status">Verlauf wird geladen …</p>
@@ -149,9 +159,15 @@
                     Keine laufenden Vorhersagen für diesen Tracker.
                 </p>
             {:else}
-                {#each data.activePredictions as prediction (prediction.id)}
+                {#each visibleActivePredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} />
                 {/each}
+                <Pagination
+                    page={currentActivePage}
+                    pageCount={activePageCount}
+                    onPageChange={(page) => activePage = page}
+                    label="Seiten für laufende Vorhersagen"
+                />
             {/if}
         </section>
 
@@ -165,9 +181,15 @@
                     Noch keine abgeschlossenen Vorhersagen für diesen Tracker.
                 </p>
             {:else}
-                {#each data.completedPredictions as prediction (prediction.id)}
+                {#each visibleCompletedPredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} />
                 {/each}
+                <Pagination
+                    page={currentCompletedPage}
+                    pageCount={completedPageCount}
+                    onPageChange={(page) => completedPage = page}
+                    label="Seiten für abgeschlossene Vorhersagen"
+                />
             {/if}
         </section>
 

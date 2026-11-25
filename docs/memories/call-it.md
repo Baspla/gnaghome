@@ -42,7 +42,7 @@ Wagers are virtual points displayed as euro (`€`). They do not touch a wallet 
 - New trackers backfill the last 30 days of 15-minute closes and five years of daily closes on creation. The five-year daily series covers both the 1-year and 5-year views. Reactivating a tracker refreshes the five-year series so long removal gaps are filled. Backfill failure does not fail tracker creation; the scheduled sync fills future points, and long-range views retry the long backfill lazily.
 - Tracker pages read persisted history. If a range longer than 30 days is requested and the tracker has no `history`-source rows yet, the service fetches five years of daily closes once and persists them before returning; later reads use the cache. This also backfills trackers created before the long-range cache existed.
 - History is currently retained indefinitely. At 15-minute intervals this is about 35k rows per tracker per year; five years of daily closes add roughly 1.3k rows per tracker, acceptable for the SQLite deployment.
-- The tracker-detail API accepts ranges up to 1825 days and downsamples large ranges to at most 1000 chart points; the full snapshot history remains in SQLite.
+- The tracker-detail API accepts ranges up to 1825 days and downsamples large ranges to at most 1000 chart points; the full snapshot history remains in SQLite. The tracker overview used by the main page accepts the same ranges and triggers the lazy long-history backfill when a range longer than 30 days is requested.
 - Prices and history are displayed in the tracker's Yahoo currency. Non-ISO Yahoo codes such as `GBp` fall back to `number + code` instead of being treated as GBP.
 - Wagers and profit/loss are always displayed as virtual EUR.
 
@@ -102,11 +102,13 @@ Frontend pages match the relevant ID, refetch persisted state, and also refetch 
 
 ## Frontend
 
-- `/callit` — current user's active predictions, other users' active predictions, an all-time net-profit leaderboard, and a tracker section below the leaderboard with a 7-day mini price chart for every active tracker. The leaderboard includes users with at least one prediction; active-only users appear with 0 completed predictions and 0 profit.
-- `/callit/users/[id]` — active and completed predictions plus stats.
-- `/callit/create` — tracker/direction/duration/wager form, including the active-prediction limit and a 30-day price chart for the selected tracker.
-- `/callit/trackers/[id]` — tracker price history with 1-day, 7-day, 30-day, 90-day, 1-year, and 5-year ranges, active/completed predictions, and the shared comments panel. Charts show top, bottom, and current price labels on the right edge.
-- Profile page: `CallItStatsCard` shows active wager count/total, all-time profit, and a link to the per-user page.
+- `/callit` — current user's active predictions, other users' active predictions (each card links to that user's Call-it page via "Alle ansehen"), a leaderboard, and a tracker section below the leaderboard with mini price charts. The tracker section has a symbol/name search filter and the shared 1-day/7-day/30-day/90-day/1-year/5-year range selector. Predictions, leaderboard entries, and trackers are paginated client-side with per-file page-size constants.
+- Leaderboard ranking uses net profit including open predictions: completed profit plus the unrealized profit/loss of active predictions at the tracker's last price. Rows show the open count, current value, and an "Alle ansehen" link to the user's Call-it page next to the name. `CallItStats.allTimeProfit` remains completed-only, while `CallItStats.unrealizedProfit` exposes the open value shown as "Aktuell (+/-)" on the main stats row, the user page, and the profile card.
+- `/callit/users/[id]` — active and completed predictions (paginated) plus stats including the current open value.
+- `/callit/create` — tracker/direction/duration/wager form, including the active-prediction limit, a shared time-range selector (default 30 days) and price chart for the selected tracker, and direction buttons with up/down arrow icons.
+- `/callit/trackers/[id]` — tracker price history with the shared 1-day/7-day/30-day/90-day/1-year/5-year range selector, paginated active/completed predictions, and the shared comments panel. Charts show top, bottom, and current price labels on the right edge.
+- Every prediction card shows a direction badge with an up or down arrow.
+- Profile page: `CallItStatsCard` shows active wager count/total, all-time profit, current open value, and a link to the per-user page. It refreshes on user-stat, tracker-price, and reconnect events.
 - Admin settings: `CallItAdminSettings` in the user settings dialog, visible only for admins. Adding a tracker requires a successful preview for the current symbol (quote, market state, 30-day chart, and existing-tracker status), and each tracker row offers a soft "Entfernen" plus a destructive "Vollständig entfernen" action.
 - Shared reaction UI: `frontend/src/lib/components/Reactions.svelte`, used by both CrewNow and predictions.
 - Dashboard activity feed: CrewNow and Call it items show the canonical comment count of their discussion and the reaction count of their target; Call it items show the tracker discussion count and the prediction reaction count.

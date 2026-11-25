@@ -72,6 +72,9 @@ export function formatDate(value: string | Date): string {
     return dateFormatter.format(new Date(value));
 }
 
+// Keep the largest range in sync with CALL_IT_MAX_HISTORY_DAYS on the backend.
+export const CALL_IT_HISTORY_RANGES = [1, 7, 30, 90, 365, 1825] as const;
+
 export function historyRangeLabel(days: number): string {
     if (days === 1) return '1 Tag';
     if (days === 365) return '1 Jahr';

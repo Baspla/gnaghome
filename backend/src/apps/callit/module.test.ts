@@ -77,6 +77,7 @@ describe('Call It HTTP module', () => {
                     activePredictionCount: 1,
                     activeWagerTotal: 100,
                     allTimeProfit: 0,
+                    unrealizedProfit: 0,
                     completedCount: 0,
                     wins: 0,
                     losses: 0,
@@ -92,6 +93,7 @@ describe('Call It HTTP module', () => {
                     activePredictionCount: 0,
                     activeWagerTotal: 0,
                     allTimeProfit: 0,
+                    unrealizedProfit: 0,
                     completedCount: 0,
                     wins: 0,
                     losses: 0,
@@ -194,6 +196,11 @@ describe('Call It HTTP module', () => {
                 history: [{ observedAt: '2026-01-01T12:00:00.000Z', price: 100 }],
             }],
         });
+
+        const longRange = await app().handle(new Request('http://localhost/callit/trackers/overview?historyDays=1825'));
+        expect(longRange.status).toBe(200);
+        const tooLong = await app().handle(new Request('http://localhost/callit/trackers/overview?historyDays=1826'));
+        expect(tooLong.status).toBe(422);
     });
 
     it('serves tracker detail history for up to five years', async () => {

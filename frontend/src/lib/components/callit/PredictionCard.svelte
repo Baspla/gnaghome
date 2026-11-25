@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { ArrowDown, ArrowUp } from '@lucide/svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
     import Reactions from '$lib/components/Reactions.svelte';
@@ -53,7 +54,17 @@
             {/if}
             <div class="min-w-0">
                 {#if showUser}
-                    <Username userId={prediction.user.id} name={prediction.user.name} image={prediction.user.image} class="block truncate text-sm font-semibold text-surface-950-50" />
+                    <div class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+                        <Username userId={prediction.user.id} name={prediction.user.name} image={prediction.user.image} class="min-w-0 truncate text-sm font-semibold text-surface-950-50" />
+                        <span class="text-surface-600-400" aria-hidden="true">·</span>
+                        <a
+                            href={`/callit/users/${encodeURIComponent(prediction.user.id)}`}
+                            class="shrink-0 text-xs font-medium text-primary-700-300 underline-offset-2 hover:underline"
+                            aria-label={`Alle Vorhersagen von ${prediction.user.name} ansehen`}
+                        >
+                            Alle ansehen
+                        </a>
+                    </div>
                 {/if}
                 <a
                     href={`/callit/trackers/${encodeURIComponent(prediction.tracker.id)}`}
@@ -64,7 +75,12 @@
                 </a>
             </div>
         </div>
-        <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold {prediction.direction === 'UP' ? 'bg-success-500 text-success-contrast-500' : 'bg-error-500 text-error-contrast-500'}">
+        <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold {prediction.direction === 'UP' ? 'bg-success-500 text-success-contrast-500' : 'bg-error-500 text-error-contrast-500'}">
+            {#if prediction.direction === 'UP'}
+                <ArrowUp class="h-3.5 w-3.5" aria-hidden="true" />
+            {:else}
+                <ArrowDown class="h-3.5 w-3.5" aria-hidden="true" />
+            {/if}
             {directionLabel(prediction.direction)}
         </span>
     </div>

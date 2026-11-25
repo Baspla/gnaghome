@@ -174,7 +174,7 @@ export function createCallItModule(
             if (!result.ok) return status(result.error.status, { error: result.error });
             return { items: result.value.map(serializeTrackerOverviewItem) };
         }, {
-            query: t.Object({ historyDays: t.Optional(t.Numeric({ minimum: 1, maximum: 365 })) }),
+            query: t.Object({ historyDays: t.Optional(t.Numeric({ minimum: 1, maximum: CALL_IT_MAX_HISTORY_DAYS })) }),
             auth: true,
         })
         .get('/trackers/:id', async ({ user, params, query, status }) => {

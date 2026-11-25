@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { ArrowDown, ArrowUp } from '@lucide/svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/state';
     import { api } from '$lib/api';
@@ -7,6 +8,7 @@
     import PageHeading from '$lib/components/PageHeading.svelte';
     import Button from '$lib/components/Button.svelte';
     import PriceHistoryChart from '$lib/components/callit/PriceHistoryChart.svelte';
+    import HistoryRangeSelector from '$lib/components/callit/HistoryRangeSelector.svelte';
     import { toaster } from '$lib/toaster';
     import { durationLabel, formatEuroPoints, formatTrackerPrice } from '$lib/components/callit/format';
     import type {
@@ -37,6 +39,7 @@
     let trackerHistoryLoading = $state(false);
     let trackerHistoryError = $state<string | null>(null);
     let trackerHistoryRequest = 0;
+    let historyDays = $state(30);
 
     $effect(() => {
         // Reuse the same ID for retries of the same form values, but never for changed inputs.
@@ -62,7 +65,7 @@
         trackerHistoryLoading = true;
         trackerHistoryError = null;
         try {
-            const response = await api.callit.trackers({ id: requestedId }).get({ query: { historyDays: 30 } });
+            const response = await api.callit.trackers({ id: requestedId }).get({ query: { historyDays } });
             if (response.error || !response.data) throw new Error('load failed');
             if (request !== trackerHistoryRequest || requestedId !== trackerId) return;
             trackerHistory = response.data.history;
@@ -76,6 +79,12 @@
                 trackerHistoryLoading = false;
             }
         }
+    }
+
+    function setHistoryRange(days: number) {
+        if (historyDays === days) return;
+        historyDays = days;
+        void loadTrackerHistory();
     }
 
     async function load() {
@@ -196,9 +205,13 @@
 
             {#if selectedTracker}
                 <div class="rounded-xl border border-surface-300-700/40 bg-surface-50-950/40 p-3">
-                    <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-surface-950-50">Kursverlauf · {selectedTracker.symbol}</h2>
-                        <span class="text-xs text-surface-600-400">Letzte 30 Tage</span>
+                        <HistoryRangeSelector
+                            value={historyDays}
+                            onChange={setHistoryRange}
+                            label="Zeitraum für den Kursverlauf"
+                        />
                     </div>
                     {#if trackerHistoryLoading}
                         <p class="py-6 text-center text-sm text-surface-600-400" role="status">Kursverlauf wird geladen …</p>
@@ -216,17 +229,19 @@
                     <button
                         type="button"
                         aria-pressed={direction === 'UP'}
-                        class="rounded-lg border px-3 py-2 text-sm font-semibold transition-colors enabled:cursor-pointer {direction === 'UP' ? 'border-success-500 bg-success-500 text-success-contrast-500' : 'border-surface-300-700 hover:bg-surface-100-900'}"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors enabled:cursor-pointer {direction === 'UP' ? 'border-success-500 bg-success-500 text-success-contrast-500' : 'border-surface-300-700 hover:bg-surface-100-900'}"
                         onclick={() => direction = 'UP'}
                     >
+                        <ArrowUp class="h-4 w-4" aria-hidden="true" />
                         Steigt
                     </button>
                     <button
                         type="button"
                         aria-pressed={direction === 'DOWN'}
-                        class="rounded-lg border px-3 py-2 text-sm font-semibold transition-colors enabled:cursor-pointer {direction === 'DOWN' ? 'border-error-500 bg-error-500 text-error-contrast-500' : 'border-surface-300-700 hover:bg-surface-100-900'}"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors enabled:cursor-pointer {direction === 'DOWN' ? 'border-error-500 bg-error-500 text-error-contrast-500' : 'border-surface-300-700 hover:bg-surface-100-900'}"
                         onclick={() => direction = 'DOWN'}
                     >
+                        <ArrowDown class="h-4 w-4" aria-hidden="true" />
                         Fällt
                     </button>
                 </div>

@@ -5,16 +5,34 @@
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
     import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
+    import Pagination from '$lib/components/Pagination.svelte';
     import PredictionCard from '$lib/components/callit/PredictionCard.svelte';
     import { formatEuroPoints } from '$lib/components/callit/format';
     import type { CallItUserPage } from '$lib/components/callit/types';
     import { setPageTitle } from '$lib/utils';
+
+    const PREDICTIONS_PER_PAGE = 5;
 
     const gateway = getGatewayManager();
     const userId = $derived(page.params.id ?? '');
     let data = $state<CallItUserPage | null>(null);
     let loading = $state(true);
     let errorMessage = $state<string | null>(null);
+    let activePage = $state(1);
+    let completedPage = $state(1);
+
+    const activePageCount = $derived(Math.max(1, Math.ceil((data?.activePredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentActivePage = $derived(Math.min(activePage, activePageCount));
+    const visibleActivePredictions = $derived((data?.activePredictions ?? []).slice(
+        (currentActivePage - 1) * PREDICTIONS_PER_PAGE,
+        currentActivePage * PREDICTIONS_PER_PAGE,
+    ));
+    const completedPageCount = $derived(Math.max(1, Math.ceil((data?.completedPredictions.length ?? 0) / PREDICTIONS_PER_PAGE)));
+    const currentCompletedPage = $derived(Math.min(completedPage, completedPageCount));
+    const visibleCompletedPredictions = $derived((data?.completedPredictions ?? []).slice(
+        (currentCompletedPage - 1) * PREDICTIONS_PER_PAGE,
+        currentCompletedPage * PREDICTIONS_PER_PAGE,
+    ));
 
     async function load() {
         try {
@@ -88,6 +106,7 @@
                 <p class="text-xl font-bold {data.stats.allTimeProfit > 0 ? 'text-success-700-300' : data.stats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
                     {formatEuroPoints(data.stats.allTimeProfit, true)}
                 </p>
+                <p class="text-xs text-surface-600-400">Aktuell: <span class="font-semibold {data.stats.unrealizedProfit > 0 ? 'text-success-700-300' : data.stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatEuroPoints(data.stats.unrealizedProfit, true)}</span></p>
                 <p class="text-xs text-surface-600-400">Aktiver Einsatz: {formatEuroPoints(data.stats.activeWagerTotal)}</p>
             </div>
         </section>
@@ -102,9 +121,15 @@
                     Keine laufenden Vorhersagen.
                 </p>
             {:else}
-                {#each data.activePredictions as prediction (prediction.id)}
+                {#each visibleActivePredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} showUser={false} />
                 {/each}
+                <Pagination
+                    page={currentActivePage}
+                    pageCount={activePageCount}
+                    onPageChange={(page) => activePage = page}
+                    label="Seiten für laufende Vorhersagen"
+                />
             {/if}
         </section>
 
@@ -118,9 +143,15 @@
                     Noch keine abgeschlossenen Vorhersagen.
                 </p>
             {:else}
-                {#each data.completedPredictions as prediction (prediction.id)}
+                {#each visibleCompletedPredictions as prediction (prediction.id)}
                     <PredictionCard {prediction} showUser={false} />
                 {/each}
+                <Pagination
+                    page={currentCompletedPage}
+                    pageCount={completedPageCount}
+                    onPageChange={(page) => completedPage = page}
+                    label="Seiten für abgeschlossene Vorhersagen"
+                />
             {/if}
         </section>
 

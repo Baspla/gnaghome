@@ -30,10 +30,13 @@
         const unsubscribeStats = gateway.onEvent('callit.user-stats.changed', (event) => {
             if (event.entityId === userId) void loadStats();
         });
+        // Active prediction values change with every tracker price sync.
+        const unsubscribeTracker = gateway.onEvent('callit.tracker.changed', () => void loadStats());
         const unsubscribeConnected = gateway.onConnected(() => void loadStats());
         void loadStats();
         return () => {
             unsubscribeStats();
+            unsubscribeTracker();
             unsubscribeConnected();
         };
     });
@@ -52,7 +55,7 @@
     {:else if errorMessage}
         <p class="mt-3 text-sm text-error-700-300" role="alert">{errorMessage}</p>
     {:else if stats}
-        <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
             <div>
                 <dt class="text-xs text-surface-600-400">Laufende Vorhersagen</dt>
                 <dd class="text-lg font-bold text-surface-950-50">{stats.activePredictionCount}</dd>
@@ -65,6 +68,12 @@
                 <dt class="text-xs text-surface-600-400">Allzeit-Gewinn</dt>
                 <dd class="text-lg font-bold {stats.allTimeProfit > 0 ? 'text-success-700-300' : stats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
                     {formatEuroPoints(stats.allTimeProfit, true)}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-xs text-surface-600-400">Aktuell</dt>
+                <dd class="text-lg font-bold {stats.unrealizedProfit > 0 ? 'text-success-700-300' : stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatEuroPoints(stats.unrealizedProfit, true)}
                 </dd>
             </div>
             <div>

@@ -15,6 +15,7 @@
         size?: string;
         class?: string;
         avatarClass?: string;
+        suffix?: string;
     };
 
     let {
@@ -25,6 +26,7 @@
         size = 'h-10 w-10',
         class: className,
         avatarClass,
+        suffix = '',
     }: Props = $props();
 
     let open = $state(false);
@@ -161,9 +163,7 @@
     >
         {#if triggerType === 'avatar'}
             <ProfileAvatar {image} {name} {size} class={avatarClass} />
-        {:else}
-            {name}
-        {/if}
+        {:else}{name}{suffix}{/if}
     </Popover.Trigger>
     <Popover.Portal>
         <Popover.Content
