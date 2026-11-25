@@ -57,13 +57,19 @@ describe('ActivityFeedService', () => {
             type: 'callit.prediction.created',
             actorUserId: 'user-1',
             target: { type: 'callit.prediction', id: 'prediction-1' },
-            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', trackerName: 'Apple Inc.', direction: 'UP' },
         });
         const completed = await service.recordActivity({
             type: 'callit.prediction.completed',
             subjectUserId: 'user-2',
             target: { type: 'callit.prediction', id: 'prediction-2' },
-            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'DOWN', successful: false },
+            data: {
+                trackerId: 'tracker-1',
+                trackerSymbol: 'AAPL',
+                trackerName: 'Apple Inc.',
+                direction: 'DOWN',
+                successful: false,
+            },
         });
 
         expect(created).toMatchObject({
@@ -73,7 +79,12 @@ describe('ActivityFeedService', () => {
                 actorUserId: 'user-1',
                 targetType: 'callit.prediction',
                 targetId: 'prediction-1',
-                data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+                data: {
+                    trackerId: 'tracker-1',
+                    trackerSymbol: 'AAPL',
+                    trackerName: 'Apple Inc.',
+                    direction: 'UP',
+                },
             },
         });
         expect(completed).toMatchObject({
@@ -82,7 +93,7 @@ describe('ActivityFeedService', () => {
                 type: 'callit.prediction.completed',
                 subjectUserId: 'user-2',
                 targetType: 'callit.prediction',
-                data: { direction: 'DOWN', successful: false },
+                data: { trackerName: 'Apple Inc.', direction: 'DOWN', successful: false },
             },
         });
         expect(await service.recordActivity({
@@ -91,6 +102,29 @@ describe('ActivityFeedService', () => {
             target: { type: 'callit.prediction', id: 'prediction-3' },
             data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'DOWN' },
         } as never)).toMatchObject({ ok: false, error: { status: 400 } });
+    });
+
+    it('keeps Call it activity payloads without a tracker name valid and rejects a malformed name', async () => {
+        const withoutName = await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-legacy' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+        });
+        expect(withoutName).toMatchObject({ ok: true, value: { data: { trackerSymbol: 'AAPL' } } });
+
+        expect(await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-blank-name' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', trackerName: '   ', direction: 'UP' },
+        })).toMatchObject({ ok: false, error: { status: 400 } });
+        expect(await service.recordActivity({
+            type: 'callit.prediction.created',
+            actorUserId: 'user-1',
+            target: { type: 'callit.prediction', id: 'prediction-long-name' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', trackerName: 'A'.repeat(201), direction: 'UP' },
+        })).toMatchObject({ ok: false, error: { status: 400 } });
     });
 
     it('stores the owning tracker discussion reference on Call it prediction activity', async () => {

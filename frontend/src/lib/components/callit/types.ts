@@ -41,8 +41,10 @@ export type CallItPrediction = {
 export type CallItStats = {
     activePredictionCount: number;
     activeWagerTotal: number;
+    allTimeWagerTotal: number;
     allTimeProfit: number;
     unrealizedProfit: number;
+    returnPercent: number | null;
     completedCount: number;
     wins: number;
     losses: number;
@@ -53,6 +55,8 @@ export type CallItLeaderboardEntry = {
     user: CallItUser;
     allTimeProfit: number;
     unrealizedProfit: number;
+    allTimeWagerTotal: number;
+    returnPercent: number | null;
     activeCount: number;
     completedCount: number;
     wins: number;

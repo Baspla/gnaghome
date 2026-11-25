@@ -379,7 +379,7 @@ describe('CallItService', () => {
             actorUserId: 'user-1',
             target: { type: 'callit.prediction', id: 'prediction-created' },
             discussionId: tracker.discussionId,
-            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'UP' },
+            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', trackerName: 'AAPL Inc.', direction: 'UP' },
         }));
         expect(notifyAll).toHaveBeenCalledWith('callit.prediction.new', ['user-1'], expect.objectContaining({
             body: expect.stringContaining('AAPL'),
@@ -411,14 +411,14 @@ describe('CallItService', () => {
             subjectUserId: 'user-1',
             target: { type: 'callit.prediction', id: 'prediction-up' },
             discussionId: tracker.discussionId,
-            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'UP', successful: true },
+            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', trackerName: 'AAPL Inc.', direction: 'UP', successful: true },
         }));
         expect(activityInputs).toContainEqual(expect.objectContaining({
             type: 'callit.prediction.completed',
             subjectUserId: 'user-2',
             target: { type: 'callit.prediction', id: 'prediction-down' },
             discussionId: tracker.discussionId,
-            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', direction: 'DOWN', successful: false },
+            data: { trackerId: tracker.id, trackerSymbol: 'AAPL', trackerName: 'AAPL Inc.', direction: 'DOWN', successful: false },
         }));
 
         expect(notifyUsers).toHaveBeenCalledWith('callit.prediction.mine-completed', ['user-1'], expect.objectContaining({
@@ -451,7 +451,7 @@ describe('CallItService', () => {
         expect(alice).toMatchObject({
             ok: true,
             value: {
-                stats: { activePredictionCount: 0, allTimeProfit: 100, completedCount: 1, wins: 1, losses: 0 },
+                stats: { activePredictionCount: 0, allTimeWagerTotal: 1000, allTimeProfit: 100, returnPercent: 10, completedCount: 1, wins: 1, losses: 0 },
                 completedPredictions: [{
                     direction: 'UP',
                     status: 'COMPLETED',
@@ -464,7 +464,7 @@ describe('CallItService', () => {
         const bob = await service.getUserPage('user-1', 'user-2');
         expect(bob).toMatchObject({
             ok: true,
-            value: { stats: { allTimeProfit: -100, completedCount: 1, wins: 0, losses: 1 } },
+            value: { stats: { allTimeWagerTotal: 1000, allTimeProfit: -100, returnPercent: -10, completedCount: 1, wins: 0, losses: 1 } },
         });
 
         const overview = await service.getOverview('user-1');
@@ -472,8 +472,8 @@ describe('CallItService', () => {
         if (!overview.ok) return;
         expect(overview.value.myActivePredictions).toHaveLength(0);
         expect(overview.value.leaderboard).toMatchObject([
-            { rank: 1, user: { id: 'user-1' }, allTimeProfit: 100, completedCount: 1, wins: 1, losses: 0 },
-            { rank: 2, user: { id: 'user-2' }, allTimeProfit: -100, completedCount: 1, wins: 0, losses: 1 },
+            { rank: 1, user: { id: 'user-1' }, allTimeProfit: 100, allTimeWagerTotal: 1000, returnPercent: 10, completedCount: 1, wins: 1, losses: 0 },
+            { rank: 2, user: { id: 'user-2' }, allTimeProfit: -100, allTimeWagerTotal: 1000, returnPercent: -10, completedCount: 1, wins: 0, losses: 1 },
         ]);
 
         const secondSync = await service.syncPrices();
@@ -496,8 +496,10 @@ describe('CallItService', () => {
                 myStats: {
                     activePredictionCount: 1,
                     activeWagerTotal: 1000,
+                    allTimeWagerTotal: 1000,
                     allTimeProfit: 0,
                     unrealizedProfit: 100,
+                    returnPercent: 10,
                     completedCount: 0,
                 },
                 leaderboard: [{
@@ -505,9 +507,67 @@ describe('CallItService', () => {
                     user: { id: 'user-1' },
                     allTimeProfit: 100,
                     unrealizedProfit: 100,
+                    allTimeWagerTotal: 1000,
+                    returnPercent: 10,
                     activeCount: 1,
                     completedCount: 0,
                 }],
+            },
+        });
+    });
+
+    it('normalizes the return percent by the total wager', async () => {
+        const tracker = await addTracker('AAPL', 100);
+        expect(await createPrediction('user-1', tracker.id, {
+            direction: 'UP',
+            durationKey: '1d',
+            wager: 1000,
+        })).toMatchObject({ ok: true });
+        expect(await createPrediction('user-2', tracker.id, {
+            direction: 'UP',
+            durationKey: '2d',
+            wager: 500,
+        })).toMatchObject({ ok: true });
+
+        now = new Date(now.getTime() + DAY_MS);
+        setQuote('AAPL', 110);
+        expect(await service.syncPrices()).toMatchObject({ ok: true, value: { predictionsResolved: 1 } });
+
+        now = new Date(now.getTime() + DAY_MS);
+        setQuote('AAPL', 120);
+        expect(await service.syncPrices()).toMatchObject({ ok: true, value: { predictionsResolved: 1 } });
+
+        const alice = await service.getUserPage('user-1', 'user-1');
+        expect(alice).toMatchObject({
+            ok: true,
+            value: {
+                stats: {
+                    allTimeProfit: 100,
+                    allTimeWagerTotal: 1000,
+                    returnPercent: 10,
+                },
+            },
+        });
+        const bob = await service.getUserPage('user-1', 'user-2');
+        expect(bob).toMatchObject({
+            ok: true,
+            value: {
+                stats: {
+                    allTimeProfit: 100,
+                    allTimeWagerTotal: 500,
+                    returnPercent: 20,
+                },
+            },
+        });
+
+        const overview = await service.getOverview('user-1');
+        expect(overview).toMatchObject({
+            ok: true,
+            value: {
+                leaderboard: [
+                    { rank: 1, user: { id: 'user-1' }, allTimeProfit: 100, allTimeWagerTotal: 1000, returnPercent: 10 },
+                    { rank: 2, user: { id: 'user-2' }, allTimeProfit: 100, allTimeWagerTotal: 500, returnPercent: 20 },
+                ],
             },
         });
     });

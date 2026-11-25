@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import {
+    directionAdjective,
     directionLabel,
     durationLabel,
     formatEuroPoints,
     formatPercent,
     formatTrackerPrice,
     historyRangeLabel,
+    trackerSymbolPreview,
 } from '../frontend/src/lib/components/callit/format';
 
 describe('Call It formatting', () => {
@@ -39,5 +41,14 @@ describe('Call It formatting', () => {
         expect(historyRangeLabel(90)).toBe('90 Tage');
         expect(historyRangeLabel(365)).toBe('1 Jahr');
         expect(historyRangeLabel(1825)).toBe('5 Jahre');
+    });
+
+    it('shortens tracker symbols to four characters and keeps direction adjectives lowercase', () => {
+        expect(trackerSymbolPreview('AAPL')).toBe('AAPL');
+        expect(trackerSymbolPreview('GOOGL')).toBe('GOOG…');
+        expect(trackerSymbolPreview('BRK.B')).toBe('BRK…');
+        expect(trackerSymbolPreview(' AAPL ')).toBe('AAPL');
+        expect(directionAdjective('UP')).toBe('steigende');
+        expect(directionAdjective('DOWN')).toBe('fallende');
     });
 });

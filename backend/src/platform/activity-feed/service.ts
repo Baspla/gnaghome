@@ -9,6 +9,10 @@ import type { ActivityFeedChangedEvent } from '$shared/dto/platform-event';
 
 const logger = createLogger('activity-feed');
 
+// Safety bound for the Call It display name. The admin API limits tracker names to 80
+// characters, but provider names stored for trackers can be longer.
+const MAX_TRACKER_NAME_LENGTH = 200;
+
 export const ACTIVITY_TYPES = [
     'crewnow.image_posted',
     'profile.updated',
@@ -30,11 +34,13 @@ export type ActivityDataByType = {
     'callit.prediction.created': {
         trackerId: string;
         trackerSymbol: string;
+        trackerName?: string;
         direction: 'UP' | 'DOWN';
     };
     'callit.prediction.completed': {
         trackerId: string;
         trackerSymbol: string;
+        trackerName?: string;
         direction: 'UP' | 'DOWN';
         successful: boolean;
     };
@@ -153,16 +159,25 @@ function isValidActivityData(type: ActivityType, data: unknown): data is Activit
             && data.title.trim().length > 0;
     }
     if (type === 'callit.prediction.created' || type === 'callit.prediction.completed') {
-        const expectedKeys = type === 'callit.prediction.created'
+        const requiredKeys = type === 'callit.prediction.created'
             ? ['trackerId', 'trackerSymbol', 'direction']
             : ['trackerId', 'trackerSymbol', 'direction', 'successful'];
-        return Object.keys(data).length === expectedKeys.length
-            && expectedKeys.every((key) => key in data)
+        const allowedKeys = new Set([...requiredKeys, 'trackerName']);
+        const keys = Object.keys(data);
+        return keys.length >= requiredKeys.length
+            && keys.length <= allowedKeys.size
+            && keys.every((key) => allowedKeys.has(key))
+            && requiredKeys.every((key) => key in data)
             && typeof data.trackerId === 'string'
             && data.trackerId.trim().length > 0
             && typeof data.trackerSymbol === 'string'
             && data.trackerSymbol.trim().length > 0
             && data.trackerSymbol.length <= 20
+            && (data.trackerName === undefined || (
+                typeof data.trackerName === 'string'
+                && data.trackerName.trim().length > 0
+                && data.trackerName.length <= MAX_TRACKER_NAME_LENGTH
+            ))
             && (data.direction === 'UP' || data.direction === 'DOWN')
             && (type === 'callit.prediction.created' || typeof data.successful === 'boolean');
     }

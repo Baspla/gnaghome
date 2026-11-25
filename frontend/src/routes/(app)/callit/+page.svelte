@@ -10,7 +10,8 @@
     import PredictionCard from '$lib/components/callit/PredictionCard.svelte';
     import Leaderboard from '$lib/components/callit/Leaderboard.svelte';
     import TrackerOverviewCard from '$lib/components/callit/TrackerOverviewCard.svelte';
-    import { formatEuroPoints, historyRangeLabel } from '$lib/components/callit/format';
+    import TrackerOverviewCardSkeleton from '$lib/components/callit/TrackerOverviewCardSkeleton.svelte';
+    import { formatEuroPoints, formatPercent, historyRangeLabel } from '$lib/components/callit/format';
     import type { CallItOverview, CallItTrackerOverviewItem } from '$lib/components/callit/types';
     import { setPageTitle } from '$lib/utils';
 
@@ -68,6 +69,10 @@
         (currentTrackersPage - 1) * TRACKERS_PER_PAGE,
         currentTrackersPage * TRACKERS_PER_PAGE,
     ));
+    const trackerPlaceholderCount = $derived.by(() => {
+        if (trackers.length === 0) return TRACKERS_PER_PAGE;
+        return Math.max(1, Math.min(TRACKERS_PER_PAGE, visibleTrackers.length));
+    });
 
     async function loadOverview() {
         try {
@@ -154,7 +159,7 @@
             <button type="button" class="btn preset-outlined mt-3 enabled:cursor-pointer" onclick={() => void loadOverview()}>Erneut versuchen</button>
         </div>
     {:else if overview}
-        <section class="grid grid-cols-2 gap-3 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4 sm:grid-cols-5" aria-label="Deine Call-it-Statistik">
+        <section class="grid grid-cols-2 gap-3 rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 p-4 sm:grid-cols-3" aria-label="Deine Call-it-Statistik">
             <div>
                 <p class="text-xs text-surface-600-400">Laufende Vorhersagen</p>
                 <p class="text-xl font-bold text-surface-950-50">{overview.myStats.activePredictionCount} / {overview.limits.maxActivePredictionsPerUser}</p>
@@ -178,6 +183,12 @@
             <div>
                 <p class="text-xs text-surface-600-400">Abgeschlossen</p>
                 <p class="text-xl font-bold text-surface-950-50">{overview.myStats.completedCount}</p>
+            </div>
+            <div>
+                <p class="text-xs text-surface-600-400" title="Gesamt-Gewinn/Verlust im Verhältnis zum gesamten Einsatz">Rendite</p>
+                <p class="text-xl font-bold {overview.myStats.returnPercent !== null && overview.myStats.returnPercent > 0 ? 'text-success-700-300' : overview.myStats.returnPercent !== null && overview.myStats.returnPercent < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatPercent(overview.myStats.returnPercent)}
+                </p>
             </div>
         </section>
 
@@ -263,9 +274,20 @@
                 />
             </div>
             {#if trackersLoading}
-                <p class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 px-5 py-8 text-center text-sm text-surface-600-400" role="status">
-                    Tracker werden geladen …
-                </p>
+                <div class="grid gap-3 sm:grid-cols-2" aria-hidden="true">
+                    {#each Array.from({ length: trackerPlaceholderCount }) as _, index (index)}
+                        <TrackerOverviewCardSkeleton />
+                    {/each}
+                </div>
+                <p class="sr-only" role="status">Tracker werden geladen …</p>
+                {#if trackersPageCount > 1}
+                    <Pagination
+                        page={currentTrackersPage}
+                        pageCount={trackersPageCount}
+                        onPageChange={(page) => trackersPage = page}
+                        label="Seiten für Tracker"
+                    />
+                {/if}
             {:else if trackersError}
                 <div class="rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30 px-5 py-6 text-center" role="alert">
                     <p class="text-sm text-error-700-300">{trackersError}</p>

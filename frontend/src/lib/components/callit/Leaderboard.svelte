@@ -3,7 +3,7 @@
     import Username from '$lib/components/Username.svelte';
     import Pagination from '$lib/components/Pagination.svelte';
     import type { CallItLeaderboardEntry } from './types';
-    import { formatEuroPoints } from './format';
+    import { formatEuroPoints, formatPercent } from './format';
 
     type Props = {
         entries: CallItLeaderboardEntry[];
@@ -19,7 +19,7 @@
 <section class="overflow-hidden rounded-2xl border border-surface-300-700/40 bg-surface-100-900/30" aria-labelledby="callit-leaderboard-heading">
     <div class="flex items-center justify-between gap-3 border-b border-surface-300-700/40 px-4 py-3 sm:px-5">
         <h2 id="callit-leaderboard-heading" class="text-lg font-semibold text-surface-950-50">Rangliste</h2>
-        <span class="text-xs text-surface-600-400">Gesamt-Gewinn/Verlust inkl. laufender Vorhersagen</span>
+        <span class="text-xs text-surface-600-400">Gesamt-Gewinn/Verlust inkl. laufender Vorhersagen · Rendite in % des Einsatzes</span>
     </div>
 
     {#if entries.length === 0}
@@ -61,12 +61,20 @@
                             {/if}
                         </p>
                     </div>
-                    <a
-                        href={`/callit/users/${encodeURIComponent(entry.user.id)}`}
-                        class="shrink-0 rounded-lg px-2 py-1 text-sm font-bold underline-offset-2 hover:underline {entry.allTimeProfit > 0 ? 'text-success-700-300' : entry.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}"
-                    >
-                        {formatEuroPoints(entry.allTimeProfit, true)}
-                    </a>
+                    <div class="flex shrink-0 items-baseline gap-2">
+                        <span
+                            class="text-xs font-medium text-surface-600-400"
+                            title={`Rendite bezogen auf ${formatEuroPoints(entry.allTimeWagerTotal)} Einsatz`}
+                        >
+                            <span class="sr-only">Rendite </span>{formatPercent(entry.returnPercent)}
+                        </span>
+                        <a
+                            href={`/callit/users/${encodeURIComponent(entry.user.id)}`}
+                            class="rounded-lg px-2 py-1 text-sm font-bold underline-offset-2 hover:underline {entry.allTimeProfit > 0 ? 'text-success-700-300' : entry.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}"
+                        >
+                            {formatEuroPoints(entry.allTimeProfit, true)}
+                        </a>
+                    </div>
                 </li>
             {/each}
         </ol>

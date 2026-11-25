@@ -158,7 +158,7 @@ describe('activity feed HTTP module', () => {
             type: 'callit.prediction.created',
             actorUserId: 'actor-1',
             target: { type: 'callit.prediction', id: 'prediction-1' },
-            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', direction: 'UP' },
+            data: { trackerId: 'tracker-1', trackerSymbol: 'AAPL', trackerName: 'Apple Inc.', direction: 'UP' },
             occurredAt: new Date('2026-10-28T12:00:00.000Z'),
         });
         await service.recordActivity({
@@ -168,6 +168,7 @@ describe('activity feed HTTP module', () => {
             data: {
                 trackerId: 'tracker-1',
                 trackerSymbol: 'AAPL',
+                trackerName: 'Apple Inc.',
                 direction: 'UP',
                 successful: true,
             },
@@ -184,12 +185,12 @@ describe('activity feed HTTP module', () => {
                 actor: null,
                 subject: { id: 'subject-1', name: 'Bob', image: null },
                 target: { type: 'callit.prediction', id: 'prediction-1' },
-                data: { trackerSymbol: 'AAPL', direction: 'UP', successful: true },
+                data: { trackerSymbol: 'AAPL', trackerName: 'Apple Inc.', direction: 'UP', successful: true },
             }, {
                 type: 'callit.prediction.created',
                 actor: { id: 'actor-1', name: 'Alice' },
                 target: { type: 'callit.prediction', id: 'prediction-1' },
-                data: { trackerSymbol: 'AAPL', direction: 'UP' },
+                data: { trackerSymbol: 'AAPL', trackerName: 'Apple Inc.', direction: 'UP' },
             }],
         });
 

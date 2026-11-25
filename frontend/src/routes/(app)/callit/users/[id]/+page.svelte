@@ -7,7 +7,7 @@
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Pagination from '$lib/components/Pagination.svelte';
     import PredictionCard from '$lib/components/callit/PredictionCard.svelte';
-    import { formatEuroPoints } from '$lib/components/callit/format';
+    import { formatEuroPoints, formatPercent } from '$lib/components/callit/format';
     import type { CallItUserPage } from '$lib/components/callit/types';
     import { setPageTitle } from '$lib/utils';
 
@@ -105,6 +105,9 @@
                 <p class="text-xs text-surface-600-400">Allzeit-Gewinn</p>
                 <p class="text-xl font-bold {data.stats.allTimeProfit > 0 ? 'text-success-700-300' : data.stats.allTimeProfit < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
                     {formatEuroPoints(data.stats.allTimeProfit, true)}
+                </p>
+                <p class="text-xs text-surface-600-400" title={`Bezogen auf ${formatEuroPoints(data.stats.allTimeWagerTotal)} Einsatz`}>
+                    Rendite: <span class="font-semibold {data.stats.returnPercent !== null && data.stats.returnPercent > 0 ? 'text-success-700-300' : data.stats.returnPercent !== null && data.stats.returnPercent < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatPercent(data.stats.returnPercent)}</span>
                 </p>
                 <p class="text-xs text-surface-600-400">Aktuell: <span class="font-semibold {data.stats.unrealizedProfit > 0 ? 'text-success-700-300' : data.stats.unrealizedProfit < 0 ? 'text-error-700-300' : 'text-surface-600-400'}">{formatEuroPoints(data.stats.unrealizedProfit, true)}</span></p>
                 <p class="text-xs text-surface-600-400">Aktiver Einsatz: {formatEuroPoints(data.stats.activeWagerTotal)}</p>

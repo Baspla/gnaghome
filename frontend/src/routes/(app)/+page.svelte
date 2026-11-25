@@ -6,7 +6,7 @@
     import PageHeading from '$lib/components/PageHeading.svelte';
     import ProfilePicture from '$lib/components/ProfilePicture.svelte';
     import Username from '$lib/components/Username.svelte';
-    import { directionLabel } from '$lib/components/callit/format';
+    import { directionAdjective, trackerSymbolPreview } from '$lib/components/callit/format';
     import { ChevronRight, Heart, MessageCircle } from '@lucide/svelte';
     import { setPageTitle } from '$lib/utils';
 
@@ -25,6 +25,7 @@
             taggedUsers?: Array<{ id: string; name: string; image: string | null }>;
             trackerId?: string;
             trackerSymbol?: string;
+            trackerName?: string;
             direction?: 'UP' | 'DOWN';
             successful?: boolean;
         };
@@ -74,12 +75,25 @@
         return activity.target?.type === 'crewnow.post' ? 'CrewNow öffnen' : 'Profil öffnen';
     }
 
-    function callItDirection(activity: Activity): string {
-        return activity.data.direction ? directionLabel(activity.data.direction) : '';
+    function activityTrackerName(activity: Activity): string | null {
+        return activity.data.trackerName?.trim() || null;
     }
 
-    function callItDirectionVerb(activity: Activity): string {
-        return activity.data.direction === 'DOWN' ? 'fällt' : 'steigt';
+    function activityTrackerSymbol(activity: Activity): string | null {
+        return activity.data.trackerSymbol?.trim() || null;
+    }
+
+    function activityTrackerTitle(activity: Activity): string {
+        const name = activityTrackerName(activity);
+        const symbol = activityTrackerSymbol(activity);
+        if (name && symbol) return `${name} (${symbol})`;
+        return name ?? symbol ?? 'Tracker';
+    }
+
+    function callItPredictionNoun(activity: Activity): string {
+        return activity.data.direction
+            ? `${directionAdjective(activity.data.direction)} Vorhersage`
+            : 'Vorhersage';
     }
 
     function possessiveSuffix(name: string): string {
@@ -147,6 +161,35 @@
         };
     });
 </script>
+
+{#snippet trackerLabel(activity: Activity)}
+    {@const name = activityTrackerName(activity)}
+    {@const symbol = activityTrackerSymbol(activity)}
+    {@const title = activityTrackerTitle(activity)}
+    {#if activity.data.trackerId && symbol}
+        <a
+            class="font-semibold text-primary-700-300 hover:underline"
+            href={`/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`}
+            title={title}
+        >
+            {#if name}
+                <span>{name}</span>{' '}
+                <span class="text-xs text-surface-600-400">({trackerSymbolPreview(symbol)})</span>
+            {:else}
+                {trackerSymbolPreview(symbol)}
+            {/if}
+        </a>
+    {:else}
+        <span class="font-semibold" title={title}>
+            {#if name}
+                <span>{name}</span>{' '}
+                {#if symbol}<span class="text-xs text-surface-600-400">({trackerSymbolPreview(symbol)})</span>{/if}
+            {:else}
+                {symbol ?? 'einen Tracker'}
+            {/if}
+        </span>
+    {/if}
+{/snippet}
 
 <main class="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-6">
     <header>
@@ -236,18 +279,9 @@
                                     {/if}
                                     <span> gepostet.</span>
                                 {:else if activity.type === 'callit.prediction.created'}
-                                    <span> hat eine Vorhersage auf </span>
-                                    {#if activity.data.trackerId && activity.data.trackerSymbol}
-                                        <a
-                                            class="font-semibold text-primary-700-300 hover:underline"
-                                            href={`/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`}
-                                        >{activity.data.trackerSymbol}</a>
-                                    {:else}
-                                        <span class="font-semibold">{activity.data.trackerSymbol ?? 'einen Tracker'}</span>
-                                    {/if}
-                                    {#if activity.data.direction}
-                                        <span> ({callItDirection(activity)})</span>
-                                    {/if}
+                                    <span> hat eine </span>
+                                    <span>{callItPredictionNoun(activity)} auf </span>
+                                    {@render trackerLabel(activity)}
                                     <span> platziert.</span>
                                 {:else if activity.type === 'callit.prediction.completed'}
                                     {@const predictionOwner = activity.subject ?? activity.actor}
@@ -258,23 +292,12 @@
                                             image={predictionOwner.image}
                                             class="font-semibold text-surface-950-50"
                                             suffix={possessiveSuffix(predictionOwner.name)}
-                                        /><span>{' '}Vorhersage{activity.data.direction ? ', dass ' : ' auf '}</span>
+                                        /><span> {callItPredictionNoun(activity)} auf </span>
                                     {:else}
-                                        <span>Die Vorhersage{activity.data.direction ? ', dass ' : ' auf '}</span>
+                                        <span>Die {callItPredictionNoun(activity)} auf </span>
                                     {/if}
-                                    {#if activity.data.trackerId && activity.data.trackerSymbol}
-                                        <a
-                                            class="font-semibold text-primary-700-300 hover:underline"
-                                            href={`/callit/trackers/${encodeURIComponent(activity.data.trackerId)}`}
-                                        >{activity.data.trackerSymbol}</a>
-                                    {:else}
-                                        <span class="font-semibold">{activity.data.trackerSymbol ?? 'einen Tracker'}</span>
-                                    {/if}
-                                    {#if activity.data.direction}
-                                        <span> {callItDirectionVerb(activity)}, war </span>
-                                    {:else}
-                                        <span> war </span>
-                                    {/if}
+                                    {@render trackerLabel(activity)}
+                                    <span> war </span>
                                     <span class={activity.data.successful ? 'font-semibold text-success-600-400' : 'font-semibold text-error-600-400'}>
                                         {activity.data.successful ? 'korrekt' : 'falsch'}.
                                     </span>

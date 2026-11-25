@@ -79,8 +79,10 @@ describe('Call It HTTP module', () => {
                 myStats: {
                     activePredictionCount: 1,
                     activeWagerTotal: 100,
+                    allTimeWagerTotal: 0,
                     allTimeProfit: 0,
                     unrealizedProfit: 0,
+                    returnPercent: null,
                     completedCount: 0,
                     wins: 0,
                     losses: 0,
@@ -95,8 +97,10 @@ describe('Call It HTTP module', () => {
                 stats: {
                     activePredictionCount: 0,
                     activeWagerTotal: 0,
+                    allTimeWagerTotal: 0,
                     allTimeProfit: 0,
                     unrealizedProfit: 0,
+                    returnPercent: null,
                     completedCount: 0,
                     wins: 0,
                     losses: 0,

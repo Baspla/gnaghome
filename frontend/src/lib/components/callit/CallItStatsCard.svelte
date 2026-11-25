@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { api } from '$lib/api';
     import { getGatewayManager } from '$lib/gateway/gateway-context.svelte';
-    import { formatEuroPoints } from './format';
+    import { formatEuroPoints, formatPercent } from './format';
     import type { CallItStats } from './types';
 
     type Props = { userId: string };
@@ -55,7 +55,7 @@
     {:else if errorMessage}
         <p class="mt-3 text-sm text-error-700-300" role="alert">{errorMessage}</p>
     {:else if stats}
-        <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>
                 <dt class="text-xs text-surface-600-400">Laufende Vorhersagen</dt>
                 <dd class="text-lg font-bold text-surface-950-50">{stats.activePredictionCount}</dd>
@@ -79,6 +79,12 @@
             <div>
                 <dt class="text-xs text-surface-600-400">Abgeschlossen</dt>
                 <dd class="text-lg font-bold text-surface-950-50">{stats.completedCount}</dd>
+            </div>
+            <div>
+                <dt class="text-xs text-surface-600-400" title="Gesamt-Gewinn/Verlust im Verhältnis zum gesamten Einsatz">Rendite</dt>
+                <dd class="text-lg font-bold {stats.returnPercent !== null && stats.returnPercent > 0 ? 'text-success-700-300' : stats.returnPercent !== null && stats.returnPercent < 0 ? 'text-error-700-300' : 'text-surface-950-50'}">
+                    {formatPercent(stats.returnPercent)}
+                </dd>
             </div>
         </dl>
     {:else}

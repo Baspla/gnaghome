@@ -140,8 +140,10 @@ export type CallItPredictionSummary = {
 export type CallItStats = {
     activePredictionCount: number;
     activeWagerTotal: number;
+    allTimeWagerTotal: number;
     allTimeProfit: number;
     unrealizedProfit: number;
+    returnPercent: number | null;
     completedCount: number;
     wins: number;
     losses: number;
@@ -152,6 +154,8 @@ export type CallItLeaderboardEntry = {
     user: CallItUserSummary;
     allTimeProfit: number;
     unrealizedProfit: number;
+    allTimeWagerTotal: number;
+    returnPercent: number | null;
     activeCount: number;
     completedCount: number;
     wins: number;
@@ -272,6 +276,7 @@ type StatsInput = Pick<CallItPrediction, 'status' | 'wager' | 'direction' | 'sta
 function computeStats(predictions: StatsInput[]): CallItStats {
     let activePredictionCount = 0;
     let activeWagerTotal = 0;
+    let allTimeWagerTotal = 0;
     let allTimeProfit = 0;
     let unrealizedProfit = 0;
     let completedCount = 0;
@@ -279,6 +284,7 @@ function computeStats(predictions: StatsInput[]): CallItStats {
     let losses = 0;
 
     for (const prediction of predictions) {
+        allTimeWagerTotal += prediction.wager;
         if (prediction.status === 'ACTIVE') {
             activePredictionCount += 1;
             activeWagerTotal += prediction.wager;
@@ -299,11 +305,14 @@ function computeStats(predictions: StatsInput[]): CallItStats {
         else if (profit < 0) losses += 1;
     }
 
+    const netProfit = allTimeProfit + unrealizedProfit;
     return {
         activePredictionCount,
         activeWagerTotal,
+        allTimeWagerTotal,
         allTimeProfit,
         unrealizedProfit,
+        returnPercent: allTimeWagerTotal > 0 ? (netProfit / allTimeWagerTotal) * 100 : null,
         completedCount,
         wins,
         losses,
@@ -1089,6 +1098,7 @@ export class CallItService {
                 data: {
                     trackerId: tracker.id,
                     trackerSymbol: tracker.symbol,
+                    trackerName: tracker.name,
                     direction: prediction.direction,
                 },
                 occurredAt: prediction.createdAt,
@@ -1153,6 +1163,7 @@ export class CallItService {
                 user: CallItUserSummary;
                 completedProfit: number;
                 unrealizedProfit: number;
+                allTimeWagerTotal: number;
                 activeCount: number;
                 completedCount: number;
                 wins: number;
@@ -1163,11 +1174,13 @@ export class CallItService {
                     user: { id: row.userId, name: row.name, image: row.image },
                     completedProfit: 0,
                     unrealizedProfit: 0,
+                    allTimeWagerTotal: 0,
                     activeCount: 0,
                     completedCount: 0,
                     wins: 0,
                     losses: 0,
                 };
+                entry.allTimeWagerTotal += row.wager;
                 if (row.status === 'ACTIVE') {
                     entry.activeCount += 1;
                     if (row.currentPrice !== null && row.currentPrice > 0) {
@@ -1189,10 +1202,16 @@ export class CallItService {
             }
 
             const leaderboard = [...leaderboardUsers.values()]
-                .map((entry) => ({
-                    ...entry,
-                    allTimeProfit: entry.completedProfit + entry.unrealizedProfit,
-                }))
+                .map((entry) => {
+                    const allTimeProfit = entry.completedProfit + entry.unrealizedProfit;
+                    return {
+                        ...entry,
+                        allTimeProfit,
+                        returnPercent: entry.allTimeWagerTotal > 0
+                            ? (allTimeProfit / entry.allTimeWagerTotal) * 100
+                            : null,
+                    };
+                })
                 .sort((a, b) => b.allTimeProfit - a.allTimeProfit
                     || b.completedCount - a.completedCount
                     || a.user.name.localeCompare(b.user.name))
@@ -1201,6 +1220,8 @@ export class CallItService {
                     user: entry.user,
                     allTimeProfit: entry.allTimeProfit,
                     unrealizedProfit: entry.unrealizedProfit,
+                    allTimeWagerTotal: entry.allTimeWagerTotal,
+                    returnPercent: entry.returnPercent,
                     activeCount: entry.activeCount,
                     completedCount: entry.completedCount,
                     wins: entry.wins,
@@ -1543,6 +1564,7 @@ export class CallItService {
                     data: {
                         trackerId: tracker.id,
                         trackerSymbol: tracker.symbol,
+                        trackerName: tracker.name,
                         direction: prediction.direction,
                         successful,
                     },

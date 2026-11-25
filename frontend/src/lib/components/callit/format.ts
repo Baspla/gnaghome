@@ -96,3 +96,18 @@ export function durationLabel(key: CallItDurationKey): string {
 export function directionLabel(direction: CallItDirection): string {
     return direction === 'UP' ? 'Steigt' : 'Fällt';
 }
+
+export function directionAdjective(direction: CallItDirection): string {
+    return direction === 'UP' ? 'steigende' : 'fallende';
+}
+
+// Keep the activity feed tracker label compact; the full symbol stays in the title attribute.
+export const TRACKER_SYMBOL_PREVIEW_LENGTH = 4;
+
+export function trackerSymbolPreview(symbol: string): string {
+    const trimmed = symbol.trim();
+    if (trimmed.length <= TRACKER_SYMBOL_PREVIEW_LENGTH) return trimmed;
+    // Avoid a dangling separator before the ellipsis, e.g. "BRK.B" -> "BRK…".
+    const head = trimmed.slice(0, TRACKER_SYMBOL_PREVIEW_LENGTH).replace(/[.\-_]+$/, '');
+    return `${head}…`;
+}
